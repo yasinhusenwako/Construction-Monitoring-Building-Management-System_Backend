@@ -38,4 +38,6 @@ public class Booking {
 
     @Column(name = "assignedSupervisorId")
     private Long assignedSupervisorId;
+    @Column(name = "assignedProfessionalId")
+    private Long assignedProfessionalId;
 }

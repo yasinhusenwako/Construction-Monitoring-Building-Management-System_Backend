@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +86,9 @@ public class ProjectService {
         if (currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.USER) {
             return projectRepository.findAll();
         }
+        if (currentUser.getRole() == Role.PROFESSIONAL) {
+            return projectRepository.findByAssignedProfessionalId(currentUser.getId());
+        }
         if (currentUser.getDivisionId() == null) {
             throw new ApiException("Division not set for user");
         }
@@ -100,7 +104,8 @@ public class ProjectService {
                                 LocalDate startDate,
                                 LocalDate endDate) {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
-            throw new ApiException("Professional cannot access projects");
+            // For professionals, only return projects assigned to them
+            return projectRepository.findByAssignedProfessionalId(currentUser.getId());
         }
         Specification<Project> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -154,6 +159,20 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    public Project adminStartReview(Long id, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
+        project.setStatus(Status.UNDER_REVIEW);
+        requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.UNDER_REVIEW, admin.getId());
+        // notify assigned supervisor if present
+        if (project.getAssignedSupervisorId() != null) {
+            requestLifecycleService.notifyUser(project.getAssignedSupervisorId(), "Project under review", "Project " + project.getProjectId() + " is under review");
+        }
+        return projectRepository.save(project);
+    }
+
     public Project adminApprove(Long id, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -187,6 +206,24 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    
+    public Project adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
+        User professional = userRepository.findById(professionalId).orElseThrow(() -> new ApiException("Professional not found"));
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Selected user is not a professional");
+        }
+        
+        project.setAssignedProfessionalId(professionalId);
+        project.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+        requestLifecycleService.transition(com.org.cmbms.common.enums.RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
+        requestLifecycleService.notifyUser(professionalId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        return projectRepository.save(project);
+    }
+
     public Project adminAssign(Long id, Long divisionId, Long supervisorId, String priority, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -195,9 +232,6 @@ public class ProjectService {
         User supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
         if (supervisor.getRole() != Role.SUPERVISOR) {
             throw new ApiException("Selected user is not a supervisor");
-        }
-        if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
-            throw new ApiException("supervisor must belong to division");
         }
         project.setDivisionId(divisionId);
         project.setAssignedSupervisorId(supervisorId);

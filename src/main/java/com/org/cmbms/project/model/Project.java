@@ -55,6 +55,8 @@ public class Project {
     private Long divisionId;
     @Column(name = "assignedSupervisorId")
     private Long assignedSupervisorId;
+    @Column(name="assignedProfessionalId")
+    private Long assignedProfessionalId;
 
     @Column(name = "boqApproved")
     private Boolean boqApproved = Boolean.FALSE;

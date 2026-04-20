@@ -10,6 +10,7 @@ com\org\cmbms\reporting\controller\ReportController.class
 com\org\cmbms\common\enums\RequestType.class
 com\org\cmbms\notification\SmsService.class
 com\org\cmbms\space\service\SpaceService.class
+com\org\cmbms\maintenance\dto\AdminAssignProfessionalRequest.class
 com\org\cmbms\auth\controller\AuthController.class
 com\org\cmbms\maintenance\model\StatusHistory.class
 com\org\cmbms\file\model\FileRecord.class
@@ -45,6 +46,7 @@ com\org\cmbms\common\enums\Status.class
 com\org\cmbms\maintenance\dto\CreateMaintenanceRequestDTO.class
 com\org\cmbms\user\service\UserService.class
 com\org\cmbms\auth\dto\AuthResponse.class
+com\org\cmbms\maintenance\dto\AdminReviewRequest.class
 com\org\cmbms\CmbmsApplication.class
 com\org\cmbms\config\JwtConfig.class
 com\org\cmbms\maintenance\controller\MaintenanceController.class
@@ -68,6 +70,7 @@ com\org\cmbms\maintenance\controller\AdminController.class
 com\org\cmbms\maintenance\dto\AdminAssignRequest.class
 com\org\cmbms\auth\security\UserPrincipal.class
 com\org\cmbms\maintenance\dto\TaskStatusUpdateRequest.class
+com\org\cmbms\maintenance\controller\AdminController$1.class
 com\org\cmbms\maintenance\repository\MaintenanceRepository.class
 com\org\cmbms\maintenance\model\MaintenanceRequest.class
 com\org\cmbms\maintenance\service\WorkflowService.class

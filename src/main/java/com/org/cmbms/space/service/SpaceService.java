@@ -72,7 +72,10 @@ public class SpaceService {
 
     public List<Booking> all(UserPrincipal currentUser) {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
-            throw new ApiException("Professional cannot access bookings");
+            return spaceRepository.findByAssignedProfessionalId(currentUser.getId());
+        }
+        if (currentUser.getRole() == Role.ADMIN) {
+            return spaceRepository.findAll();
         }
         if (currentUser.getRole() == Role.SUPERVISOR && currentUser.getDivisionId() != null) {
             return spaceRepository.findByDivisionId(currentUser.getDivisionId());
@@ -88,7 +91,8 @@ public class SpaceService {
                                 Long requester,
                                 LocalDate date) {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
-            throw new ApiException("Professional cannot access bookings");
+            // For professionals, only return bookings assigned to them
+            return spaceRepository.findByAssignedProfessionalId(currentUser.getId());
         }
         Specification<Booking> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -134,6 +138,19 @@ public class SpaceService {
         return spaceRepository.save(booking);
     }
 
+    public Booking adminStartReview(Long id, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
+        booking.setStatus(Status.UNDER_REVIEW);
+        requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.UNDER_REVIEW, admin.getId());
+        if (booking.getAssignedSupervisorId() != null) {
+            requestLifecycleService.notifyUser(booking.getAssignedSupervisorId(), "Booking under review", "Booking " + booking.getBookingId() + " is under review");
+        }
+        return spaceRepository.save(booking);
+    }
+
     public Booking adminApprove(Long id, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -167,6 +184,24 @@ public class SpaceService {
         return spaceRepository.save(booking);
     }
 
+    
+    public Booking adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
+        User professional = userRepository.findById(professionalId).orElseThrow(() -> new ApiException("Professional not found"));
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Selected user is not a professional");
+        }
+        
+        booking.setAssignedProfessionalId(professionalId);
+        booking.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+        requestLifecycleService.transition(com.org.cmbms.common.enums.RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
+        requestLifecycleService.notifyUser(professionalId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        return spaceRepository.save(booking);
+    }
+
     public Booking adminAssign(Long id, Long divisionId, Long supervisorId, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -175,9 +210,6 @@ public class SpaceService {
         User supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
         if (supervisor.getRole() != Role.SUPERVISOR) {
             throw new ApiException("Selected user is not a supervisor");
-        }
-        if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
-            throw new ApiException("supervisor must belong to division");
         }
         booking.setDivisionId(divisionId);
         booking.setAssignedSupervisorId(supervisorId);

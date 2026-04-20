@@ -66,6 +66,16 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.supervisorReview(id, currentUser));
     }
 
+    @PatchMapping("/{id}/review")
+    public ResponseEntity<Project> adminStartReview(@PathVariable Long id) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        try {
+            return ResponseEntity.ok(projectService.adminStartReview(id, currentUser));
+        } catch (Exception ex) {
+            throw new com.org.cmbms.common.exception.ApiException(ex.getMessage());
+        }
+    }
+
     @PatchMapping("/{id}/approve")
     public ResponseEntity<Project> approve(@PathVariable Long id) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();

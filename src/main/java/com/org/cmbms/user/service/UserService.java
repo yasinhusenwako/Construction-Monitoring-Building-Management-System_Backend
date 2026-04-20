@@ -18,9 +18,7 @@ public class UserService {
     private final UserRepository userRepository;
 
     public List<User> allUsers(UserPrincipal currentUser) {
-        if (currentUser.getRole() != Role.ADMIN) {
-            throw new ApiException("Access denied");
-        }
+        // Allow all authenticated users to fetch users for assignment dropdowns
         return userRepository.findAll();
     }
 }

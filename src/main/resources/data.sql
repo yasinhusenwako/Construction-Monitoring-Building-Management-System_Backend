@@ -8,10 +8,10 @@ name = VALUES(name),
 description = VALUES(description);
 
 INSERT INTO users (id, name, email, password, role, divisionId) VALUES
-(1, 'System Admin', 'admin@cmbms.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi5M8QF8xB9jAq56k97X3CJidFG8sWy', 'ADMIN', NULL),
-(2, 'Division Supervisor', 'supervisor@cmbms.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi5M8QF8xB9jAq56k97X3CJidFG8sWy', 'SUPERVISOR', 1),
-(3, 'Field Professional', 'professional@cmbms.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi5M8QF8xB9jAq56k97X3CJidFG8sWy', 'PROFESSIONAL', 1),
-(4, 'Regular User', 'user@cmbms.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi5M8QF8xB9jAq56k97X3CJidFG8sWy', 'USER', NULL)
+(1, 'System Admin', 'admin@cmbms.com', '$2a$10$/O1Ts4kxwLasxJjH4I/4seCTlgZCGYV8X8d2W5nIjCbz36Wld.JUW', 'ADMIN', NULL),
+(2, 'Division Supervisor', 'supervisor@cmbms.com', '$2a$10$/O1Ts4kxwLasxJjH4I/4seCTlgZCGYV8X8d2W5nIjCbz36Wld.JUW', 'SUPERVISOR', 1),
+(3, 'Field Professional', 'professional@cmbms.com', '$2a$10$/O1Ts4kxwLasxJjH4I/4seCTlgZCGYV8X8d2W5nIjCbz36Wld.JUW', 'PROFESSIONAL', 1),
+(4, 'Regular User', 'user@cmbms.com', '$2a$10$/O1Ts4kxwLasxJjH4I/4seCTlgZCGYV8X8d2W5nIjCbz36Wld.JUW', 'USER', NULL)
 ON DUPLICATE KEY UPDATE
 name = VALUES(name),
 password = VALUES(password),

@@ -27,12 +27,13 @@ public class ReportService {
     public Map<String, Object> overview() {
         List<MaintenanceRequest> all = maintenanceRepository.findAll();
         Map<String, Long> byStatus = all.stream()
-                .filter(r -> r.getStatus() != null)
+                .filter(r -> r.getStatus() != null && r.getStatus().getValue() != null)
                 .collect(Collectors.groupingBy(r -> r.getStatus().getValue(), Collectors.counting()));
         Map<String, Object> out = new HashMap<>();
         out.put("totalRequests", all.size());
         out.put("statusBreakdown", byStatus);
         out.put("divisionRequestVolume", all.stream()
+                .filter(r -> r.getDivisionId() != null)
                 .collect(Collectors.groupingBy(MaintenanceRequest::getDivisionId, Collectors.counting())));
         return out;
     }
@@ -50,6 +51,7 @@ public class ReportService {
     public Map<String, Object> analytics() {
         List<MaintenanceRequest> all = maintenanceRepository.findAll();
         Map<Long, Long> byDivision = all.stream()
+                .filter(r -> r.getDivisionId() != null)
                 .collect(Collectors.groupingBy(MaintenanceRequest::getDivisionId, Collectors.counting()));
         Map<Long, Long> supervisorPerformance = all.stream()
                 .filter(r -> r.getAssignedSupervisorId() != null)
@@ -62,8 +64,12 @@ public class ReportService {
         out.put("requestsByDivision", byDivision);
         out.put("supervisorPerformance", supervisorPerformance);
         out.put("professionalWorkload", professionalWorkload);
-        out.put("supervisorCount", userRepository.findByRole(com.org.cmbms.common.enums.Role.SUPERVISOR).size());
-        out.put("professionalCount", userRepository.findByRole(com.org.cmbms.common.enums.Role.PROFESSIONAL).size());
+
+        List<?> supervisors = userRepository.findByRole(com.org.cmbms.common.enums.Role.SUPERVISOR);
+        List<?> professionals = userRepository.findByRole(com.org.cmbms.common.enums.Role.PROFESSIONAL);
+
+        out.put("supervisorCount", supervisors != null ? supervisors.size() : 0);
+        out.put("professionalCount", professionals != null ? professionals.size() : 0);
         return out;
     }
 }

@@ -47,6 +47,28 @@ public class RequestLifecycleService {
     }
 
     @Transactional
+    public void initializeProjectLifecycle(Long projectId, String role, String businessId) {
+        StatusHistory history = new StatusHistory();
+        history.setRequestId(projectId);
+        history.setRequestType(RequestType.PROJECT);
+        history.setStatus(Status.SUBMITTED);
+        history.setChangedBy(0L); // System/USER
+        history.setTimestamp(LocalDateTime.now());
+        statusHistoryRepository.save(history);
+    }
+
+    @Transactional
+    public void initializeSpaceLifecycle(Long bookingId, String role, String businessId) {
+        StatusHistory history = new StatusHistory();
+        history.setRequestId(bookingId);
+        history.setRequestType(RequestType.BOOKING);
+        history.setStatus(Status.SUBMITTED);
+        history.setChangedBy(0L); // System/USER
+        history.setTimestamp(LocalDateTime.now());
+        statusHistoryRepository.save(history);
+    }
+
+    @Transactional
     public void transition(RequestType type, Long requestId, Status next, Long changedBy) {
         Status current = getCurrentStatus(type, requestId);
         if (current == null) {

@@ -44,6 +44,16 @@ public class SpaceController {
         return ResponseEntity.ok(spaceService.supervisorReview(id, currentUser));
     }
 
+    @PatchMapping("/{id}/review")
+    public ResponseEntity<Booking> adminStartReview(@PathVariable Long id) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        try {
+            return ResponseEntity.ok(spaceService.adminStartReview(id, currentUser));
+        } catch (Exception ex) {
+            throw new com.org.cmbms.common.exception.ApiException(ex.getMessage());
+        }
+    }
+
     @PatchMapping("/{id}/approve")
     public ResponseEntity<Booking> approve(@PathVariable Long id) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();

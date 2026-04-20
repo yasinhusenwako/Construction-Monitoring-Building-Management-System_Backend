@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
     List<Project> findByDivisionId(Long divisionId);
     Optional<Project> findByProjectId(String projectId);
+    List<Project> findByAssignedProfessionalId(Long assignedProfessionalId);
 }
