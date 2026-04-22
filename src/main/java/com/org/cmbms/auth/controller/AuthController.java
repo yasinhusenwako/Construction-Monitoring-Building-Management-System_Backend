@@ -48,7 +48,7 @@ public class AuthController {
     private void addTokenCookie(HttpServletResponse response, String token) {
         Cookie cookie = new Cookie("insa_token", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true); // Requires HTTPS
+        cookie.setSecure(false); // Set to true in production with HTTPS
         cookie.setPath("/");
         cookie.setMaxAge(24 * 60 * 60); // 24 hours
         // Note: SameSite is configured globally in CorsConfig
@@ -58,7 +58,7 @@ public class AuthController {
     private void clearTokenCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie("insa_token", null);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(false); // Set to true in production with HTTPS
         cookie.setPath("/");
         cookie.setMaxAge(0); // Delete immediately
         response.addCookie(cookie);

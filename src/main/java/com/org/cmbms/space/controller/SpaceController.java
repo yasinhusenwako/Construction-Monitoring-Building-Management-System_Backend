@@ -71,4 +71,11 @@ public class SpaceController {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
         return ResponseEntity.ok(spaceService.adminClose(id, currentUser));
     }
+    
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Booking> updateStatus(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        String status = body.get("status");
+        return ResponseEntity.ok(spaceService.professionalUpdateStatus(id, status, currentUser));
+    }
 }

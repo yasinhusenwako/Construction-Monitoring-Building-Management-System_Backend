@@ -12,10 +12,10 @@ Set backend environment:
 
 ```bash
 DB_HOST=localhost
-DB_PORT=3306
+DB_PORT=5432
 DB_NAME=cmbms
-DB_USERNAME=root
-DB_PASSWORD=root
+DB_USERNAME=postgres
+DB_PASSWORD=br8555ML&
 JWT_SECRET=ThisIsA32ByteMinimumSecretKeyForCMBMSJwtToken123456
 JWT_EXPIRATION_MS=86400000
 UPLOAD_DIR=uploads

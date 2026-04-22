@@ -6,6 +6,7 @@ import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.enums.RequestType;
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.common.exception.ApiException;
+import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.file.model.FileRecord;
 import com.org.cmbms.file.service.FileStorageService;
 import com.org.cmbms.project.dto.BoqResponse;
@@ -17,7 +18,9 @@ import com.org.cmbms.user.repository.UserRepository;
 import com.org.cmbms.workflow.service.RequestLifecycleService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -26,7 +29,6 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +60,9 @@ public class ProjectService {
         project.setStatus(Status.SUBMITTED);
         project.setCreatedBy(currentUser.getId());
         project.setCreatedAt(LocalDateTime.now());
+        if (dto.getDivisionId() != null) {
+            DivisionRules.assertAllowed(dto.getDivisionId());
+        }
         project.setDivisionId(dto.getDivisionId());
         Project saved = projectRepository.save(project);
         requestLifecycleService.initialize(RequestType.PROJECT, saved.getId(), currentUser.getId());
@@ -206,7 +211,7 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    
+    @Transactional
     public Project adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -216,10 +221,23 @@ public class ProjectService {
         if (professional.getRole() != Role.PROFESSIONAL) {
             throw new ApiException("Selected user is not a professional");
         }
+
+        // For projects, admin can directly assign professional from Under Review
+        Status current = project.getStatus();
+        if (current == Status.SUBMITTED) {
+            requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.UNDER_REVIEW, admin.getId());
+            project.setStatus(Status.UNDER_REVIEW);
+            current = Status.UNDER_REVIEW;
+        }
+        if (current != Status.UNDER_REVIEW && current != Status.ASSIGNED_TO_PROFESSIONALS) {
+            throw new ApiException("Project must be under review before assigning a professional");
+        }
         
         project.setAssignedProfessionalId(professionalId);
+        if (current == Status.UNDER_REVIEW) {
+            requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
+        }
         project.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
-        requestLifecycleService.transition(com.org.cmbms.common.enums.RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
         requestLifecycleService.notifyUser(professionalId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
         return projectRepository.save(project);
     }
@@ -229,19 +247,106 @@ public class ProjectService {
             throw new ApiException("Access denied");
         }
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
-        User supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
-        if (supervisor.getRole() != Role.SUPERVISOR) {
-            throw new ApiException("Selected user is not a supervisor");
+        if (divisionId == null) {
+            throw new ApiException("Division is required");
         }
+        DivisionRules.assertAllowed(divisionId);
+
+        User supervisor;
+        if (supervisorId != null) {
+            supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
+            if (supervisor.getRole() != Role.SUPERVISOR) {
+                throw new ApiException("Selected user is not a supervisor");
+            }
+            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
+                throw new ApiException("Supervisor must belong to selected division");
+            }
+        } else {
+            List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, divisionId);
+            if (supervisors.isEmpty()) {
+                throw new ApiException("No supervisor account found for selected division");
+            }
+            if (supervisors.size() > 1) {
+                throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
+            }
+            supervisor = supervisors.get(0);
+        }
+
         project.setDivisionId(divisionId);
-        project.setAssignedSupervisorId(supervisorId);
+        project.setAssignedSupervisorId(supervisor.getId());
         if (priority != null && !priority.isBlank()) {
             project.setPriority(priority);
         }
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.UNDER_REVIEW, admin.getId());
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
         project.setStatus(Status.ASSIGNED_TO_SUPERVISOR);
-        requestLifecycleService.notifyUser(supervisorId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        return projectRepository.save(project);
+    }
+    
+    @Transactional
+    public Project updateProjectCost(Long id, BigDecimal materialCost, BigDecimal laborCost, String partsUsed, UserPrincipal professional) {
+        System.out.println("=== updateProjectCost called ===");
+        System.out.println("Project ID: " + id);
+        System.out.println("Material Cost: " + materialCost);
+        System.out.println("Labor Cost: " + laborCost);
+        System.out.println("Parts Used: " + partsUsed);
+        System.out.println("Professional ID: " + professional.getId());
+        
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Access denied");
+        }
+        Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
+        
+        System.out.println("Found project: " + project.getProjectId());
+        System.out.println("Assigned professional: " + project.getAssignedProfessionalId());
+        
+        if (!project.getAssignedProfessionalId().equals(professional.getId())) {
+            throw new ApiException("You are not assigned to this project");
+        }
+        
+        project.setMaterialCost(materialCost);
+        project.setLaborCost(laborCost);
+        project.setPartsUsed(partsUsed);
+        
+        BigDecimal total = BigDecimal.ZERO;
+        if (materialCost != null) total = total.add(materialCost);
+        if (laborCost != null) total = total.add(laborCost);
+        project.setTotalCost(total);
+        
+        System.out.println("Saving project with total cost: " + total);
+        Project saved = projectRepository.save(project);
+        System.out.println("Project saved successfully. Material cost in DB: " + saved.getMaterialCost());
+        
+        return saved;
+    }
+    @Transactional
+    public Project professionalUpdateStatus(Long id, String statusStr, UserPrincipal professional) {
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Access denied");
+        }
+        Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
+        if (!project.getAssignedProfessionalId().equals(professional.getId())) {
+            throw new ApiException("You are not assigned to this project");
+        }
+        Status current = project.getStatus();
+        Status newStatus;
+        if ("In Progress".equals(statusStr)) {
+            newStatus = Status.IN_PROGRESS;
+        } else if ("Completed".equals(statusStr)) {
+            newStatus = Status.COMPLETED;
+        } else {
+            throw new ApiException("Invalid status");
+        }
+        
+        if (current == Status.UNDER_REVIEW) {
+            requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_PROFESSIONALS, professional.getId());
+            project.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+            current = Status.ASSIGNED_TO_PROFESSIONALS;
+        }
+        
+        requestLifecycleService.transition(RequestType.PROJECT, project.getId(), newStatus, professional.getId());
+        project.setStatus(newStatus);
         return projectRepository.save(project);
     }
 

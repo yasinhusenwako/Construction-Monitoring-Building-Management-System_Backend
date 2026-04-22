@@ -13,7 +13,6 @@ public class AdminAssignRequest {
     private String requestType;
     @NotNull
     private Long divisionId;
-    @NotNull
     private Long supervisorId;
     private String priority;
 }

@@ -20,7 +20,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RequestLifecycleService {
 
-    private static final Map<Status, EnumSet<Status>> TRANSITIONS = Map.of(
+    // Maintenance workflow: requires supervisor assignment
+    private static final Map<Status, EnumSet<Status>> MAINTENANCE_TRANSITIONS = Map.of(
             Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW),
             Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_SUPERVISOR),
             Status.ASSIGNED_TO_SUPERVISOR, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS),
@@ -32,8 +33,26 @@ public class RequestLifecycleService {
             Status.REJECTED, EnumSet.of(Status.CLOSED)
     );
 
+    // Project/Booking workflow: admin can directly assign professional
+    private static final Map<Status, EnumSet<Status>> PROJECT_BOOKING_TRANSITIONS = Map.of(
+            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW),
+            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS),
+            Status.ASSIGNED_TO_PROFESSIONALS, EnumSet.of(Status.IN_PROGRESS),
+            Status.IN_PROGRESS, EnumSet.of(Status.COMPLETED),
+            Status.COMPLETED, EnumSet.of(Status.APPROVED, Status.REJECTED),
+            Status.APPROVED, EnumSet.of(Status.CLOSED),
+            Status.REJECTED, EnumSet.of(Status.CLOSED)
+    );
+
     private final StatusHistoryRepository statusHistoryRepository;
     private final NotificationRepository notificationRepository;
+
+    private Map<Status, EnumSet<Status>> getTransitions(RequestType type) {
+        if (type == RequestType.MAINTENANCE) {
+            return MAINTENANCE_TRANSITIONS;
+        }
+        return PROJECT_BOOKING_TRANSITIONS;
+    }
 
     @Transactional
     public void initialize(RequestType type, Long requestId, Long changedBy) {
@@ -76,7 +95,8 @@ public class RequestLifecycleService {
                 throw new ApiException("First status must be Submitted");
             }
         } else {
-            EnumSet<Status> allowed = TRANSITIONS.get(current);
+            Map<Status, EnumSet<Status>> transitions = getTransitions(type);
+            EnumSet<Status> allowed = transitions.get(current);
             if (allowed == null || !allowed.contains(next)) {
                 throw new ApiException("Invalid transition: " + current.getValue() + " -> " + next.getValue());
             }

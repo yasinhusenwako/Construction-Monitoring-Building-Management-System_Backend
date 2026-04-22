@@ -60,4 +60,16 @@ public class Project {
 
     @Column(name = "boqApproved")
     private Boolean boqApproved = Boolean.FALSE;
+    
+    @Column(name = "materialCost")
+    private BigDecimal materialCost;
+    
+    @Column(name = "laborCost")
+    private BigDecimal laborCost;
+    
+    @Column(name = "totalCost")
+    private BigDecimal totalCost;
+    
+    @Column(name = "partsUsed", columnDefinition = "TEXT")
+    private String partsUsed;
 }

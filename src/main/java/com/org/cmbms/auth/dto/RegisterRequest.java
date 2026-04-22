@@ -20,5 +20,8 @@ public class RegisterRequest {
     private String password;
     private Role role;
     private Long divisionId;
+    private String phone;
+    private String department;
+    private String profession;
 }
 

@@ -24,11 +24,13 @@ com\org\cmbms\config\SwaggerConfig.class
 com\org\cmbms\maintenance\repository\WorkOrderRepository.class
 com\org\cmbms\notification\model\Notification.class
 com\org\cmbms\auth\jwt\JwtFilter.class
+com\org\cmbms\user\dto\UserUpdateRequest.class
 com\org\cmbms\common\security\SecurityUtils.class
 com\org\cmbms\file\service\FileStorageService.class
 com\org\cmbms\maintenance\dto\AssignSupervisorRequest.class
 com\org\cmbms\division\repository\DivisionRepository.class
 com\org\cmbms\maintenance\dto\ReviewRequest.class
+com\org\cmbms\maintenance\dto\CostUpdateRequest.class
 com\org\cmbms\project\dto\ProjectRequestDTO.class
 com\org\cmbms\maintenance\dto\AssignGenericRequest.class
 com\org\cmbms\maintenance\repository\StatusHistoryRepository.class
@@ -37,6 +39,7 @@ com\org\cmbms\auth\security\CustomUserDetailsService.class
 com\org\cmbms\auth\dto\ForgotPasswordRequest.class
 com\org\cmbms\common\util\IdGenerator.class
 com\org\cmbms\maintenance\model\WorkOrder.class
+com\org\cmbms\common\util\DivisionRules.class
 com\org\cmbms\maintenance\service\MaintenanceService.class
 com\org\cmbms\notification\EmailService.class
 com\org\cmbms\common\exception\ResourceNotFoundException.class

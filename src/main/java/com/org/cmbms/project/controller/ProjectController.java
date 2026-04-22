@@ -93,4 +93,12 @@ public class ProjectController {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
         return ResponseEntity.ok(projectService.adminClose(id, currentUser));
     }
+    
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Project> updateStatus(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        String status = body.get("status");
+        return ResponseEntity.ok(projectService.professionalUpdateStatus(id, status, currentUser));
+    }
 }
+
