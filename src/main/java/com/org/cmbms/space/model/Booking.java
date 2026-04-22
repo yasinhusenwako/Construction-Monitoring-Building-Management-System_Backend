@@ -40,4 +40,16 @@ public class Booking {
     private Long assignedSupervisorId;
     @Column(name = "assignedProfessionalId")
     private Long assignedProfessionalId;
+    
+    @Column(name = "materialCost")
+    private java.math.BigDecimal materialCost;
+    
+    @Column(name = "laborCost")
+    private java.math.BigDecimal laborCost;
+    
+    @Column(name = "totalCost")
+    private java.math.BigDecimal totalCost;
+    
+    @Column(name = "partsUsed", columnDefinition = "TEXT")
+    private String partsUsed;
 }

@@ -5,6 +5,7 @@ import com.org.cmbms.auth.security.UserPrincipal;
 import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.common.exception.ApiException;
+import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.maintenance.dto.CreateMaintenanceRequestDTO;
 import com.org.cmbms.maintenance.model.MaintenanceRequest;
 import com.org.cmbms.maintenance.repository.MaintenanceRepository;
@@ -33,6 +34,9 @@ public class MaintenanceService {
         request.setLocation(dto.getLocation());
         request.setCreatedBy(user.getId());
         request.setCreatedAt(LocalDateTime.now());
+        if (dto.getDivisionId() != null) {
+            DivisionRules.assertAllowed(dto.getDivisionId());
+        }
         request.setDivisionId(dto.getDivisionId());
         MaintenanceRequest saved = maintenanceRepository.save(request);
         workflowService.initializeSubmittedStatus(saved, user.getId());
@@ -45,12 +49,22 @@ public class MaintenanceService {
                                            String maintenanceId,
                                            Long divisionId,
                                            Long createdBy) {
+        // Professionals only see their assigned requests
         if (user.getRole() == Role.PROFESSIONAL) {
             return maintenanceRepository.findByAssignedProfessionalId(user.getId());
         }
+        
+        // Supervisors need a division
         if (user.getRole() == Role.SUPERVISOR && user.getDivisionId() == null) {
             throw new ApiException("Division not set for supervisor");
         }
+        
+        // Users only see their own requests
+        if (user.getRole() == Role.USER) {
+            return maintenanceRepository.findByCreatedBy(user.getId());
+        }
+        
+        // Admin and Supervisors can search with filters
         Specification<MaintenanceRequest> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -68,6 +82,7 @@ public class MaintenanceService {
             if (createdBy != null) {
                 predicates.add(cb.equal(root.get("createdBy"), createdBy));
             }
+            // Supervisors only see requests in their division
             if (user.getRole() == Role.SUPERVISOR) {
                 predicates.add(cb.equal(root.get("divisionId"), user.getDivisionId()));
             }

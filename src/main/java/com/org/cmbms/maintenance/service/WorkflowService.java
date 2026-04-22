@@ -5,6 +5,7 @@ import com.org.cmbms.common.enums.RequestType;
 import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.common.exception.ApiException;
+import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.common.exception.ResourceNotFoundException;
 import com.org.cmbms.maintenance.dto.AssignProfessionalRequest;
 import com.org.cmbms.maintenance.dto.AssignSupervisorRequest;
@@ -77,19 +78,38 @@ public class WorkflowService {
         if (request.getDivisionId() == null) {
             throw new ApiException("Division REQUIRED before assignment");
         }
+        DivisionRules.assertAllowed(request.getDivisionId());
         MaintenanceRequest maintenance = getMaintenance(request.getRequestId());
         maintenance.setDivisionId(request.getDivisionId());
         if (request.getPriority() != null && !request.getPriority().isBlank()) {
             maintenance.setPriority(request.getPriority());
         }
 
-        User supervisor = userRepository.findById(request.getSupervisorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Supervisor not found"));
-        if (supervisor.getRole() != Role.SUPERVISOR) {
-            throw new ApiException("Selected user is not a supervisor");
+        User supervisor;
+        if (request.getSupervisorId() != null) {
+            supervisor = userRepository.findById(request.getSupervisorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Supervisor not found"));
+            if (supervisor.getRole() != Role.SUPERVISOR) {
+                throw new ApiException("Selected user is not a supervisor");
+            }
+            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(request.getDivisionId())) {
+                throw new ApiException("Supervisor must belong to selected division");
+            }
+        } else {
+            List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, request.getDivisionId());
+            if (supervisors.isEmpty()) {
+                throw new ApiException("No supervisor account found for selected division");
+            }
+            if (supervisors.size() > 1) {
+                throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
+            }
+            supervisor = supervisors.get(0);
         }
         maintenance.setAssignedSupervisorId(supervisor.getId());
-        transition(maintenance, Status.UNDER_REVIEW, admin.getId());
+        // Only transition to UNDER_REVIEW if currently SUBMITTED
+        if (maintenance.getStatus() == Status.SUBMITTED) {
+            transition(maintenance, Status.UNDER_REVIEW, admin.getId());
+        }
         transition(maintenance, Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
         requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "You have been assigned maintenance " + maintenance.getMaintenanceId());
         return maintenanceRepository.save(maintenance);
@@ -99,15 +119,24 @@ public class WorkflowService {
     public MaintenanceRequest assignProfessional(UserPrincipal supervisor, AssignProfessionalRequest request) {
         ensureRole(supervisor, Role.SUPERVISOR);
         MaintenanceRequest maintenance = getMaintenance(request.getRequestId());
-        if (!maintenance.getDivisionId().equals(supervisor.getDivisionId())) {
+        
+        // If maintenance doesn't have a division yet, assign supervisor's division
+        if (maintenance.getDivisionId() == null) {
+            maintenance.setDivisionId(supervisor.getDivisionId());
+        } else if (!maintenance.getDivisionId().equals(supervisor.getDivisionId())) {
             throw new ApiException("supervisor sees only division requests");
         }
+        
         User professional = userRepository.findById(request.getAssignedProfessionalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
         if (professional.getRole() != Role.PROFESSIONAL) {
             throw new ApiException("Selected user is not a professional");
         }
-        if (professional.getDivisionId() == null || !professional.getDivisionId().equals(supervisor.getDivisionId())) {
+        if (professional.getDivisionId() == null) {
+            // First assignment binds the professional to supervisor's division for consistent routing.
+            professional.setDivisionId(supervisor.getDivisionId());
+            userRepository.save(professional);
+        } else if (!professional.getDivisionId().equals(supervisor.getDivisionId())) {
             throw new ApiException("Professional must belong to the same division as the supervisor and request.");
         }
 
@@ -174,11 +203,18 @@ public class WorkflowService {
 
     @Transactional
     public MaintenanceRequest supervisorReview(UserPrincipal supervisor, Long requestId) {
-        ensureRole(supervisor, Role.SUPERVISOR);
+        if (supervisor.getRole() != Role.SUPERVISOR && supervisor.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
         MaintenanceRequest maintenance = getMaintenance(requestId);
-        if (!supervisor.getDivisionId().equals(maintenance.getDivisionId())) {
+        
+        // If maintenance doesn't have a division yet, assign supervisor's division
+        if (maintenance.getDivisionId() == null) {
+            maintenance.setDivisionId(supervisor.getDivisionId());
+        } else if (supervisor.getRole() == Role.SUPERVISOR && !supervisor.getDivisionId().equals(maintenance.getDivisionId())) {
             throw new ApiException("supervisor sees only division requests");
         }
+        
         transition(maintenance, Status.REVIEWED, supervisor.getId());
         return maintenanceRepository.save(maintenance);
     }
@@ -210,6 +246,10 @@ public class WorkflowService {
         statusHistoryRepository.save(history);
         if (next == Status.COMPLETED && request.getAssignedSupervisorId() != null) {
             requestLifecycleService.notifyUser(request.getAssignedSupervisorId(), "Task completed", "Maintenance " + request.getMaintenanceId() + " completed");
+            List<User> admins = userRepository.findByRole(Role.ADMIN);
+            for (User admin : admins) {
+                requestLifecycleService.notifyUser(admin.getId(), "Task completed", "Maintenance " + request.getMaintenanceId() + " completed and ready for review");
+            }
         }
         if (next == Status.REVIEWED) {
             List<User> admins = userRepository.findByRole(Role.ADMIN);
@@ -231,6 +271,29 @@ public class WorkflowService {
         history.setChangedBy(userId);
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
+    }
+
+    @Transactional
+    public MaintenanceRequest updateTaskCost(UserPrincipal user, Long id, com.org.cmbms.maintenance.dto.CostUpdateRequest request) {
+        ensureRole(user, Role.PROFESSIONAL);
+        MaintenanceRequest maintenance = getMaintenance(id);
+        
+        // Verify the professional is assigned to this task
+        if (maintenance.getAssignedProfessionalId() == null || !maintenance.getAssignedProfessionalId().equals(user.getId())) {
+            throw new ApiException("You are not assigned to this task");
+        }
+        
+        // Update cost information
+        maintenance.setMaterialCost(request.getMaterialCost());
+        maintenance.setLaborCost(request.getLaborCost());
+        maintenance.setPartsUsed(request.getPartsUsed());
+        
+        // Calculate total cost
+        double materialCost = request.getMaterialCost() != null ? request.getMaterialCost() : 0.0;
+        double laborCost = request.getLaborCost() != null ? request.getLaborCost() : 0.0;
+        maintenance.setTotalCost(materialCost + laborCost);
+        
+        return maintenanceRepository.save(maintenance);
     }
 
     private MaintenanceRequest getMaintenance(Long id) {

@@ -6,6 +6,7 @@ import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.enums.RequestType;
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.common.exception.ApiException;
+import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.space.dto.BookingRequestDTO;
 import com.org.cmbms.space.model.Booking;
 import com.org.cmbms.space.repository.SpaceRepository;
@@ -15,6 +16,7 @@ import com.org.cmbms.workflow.service.RequestLifecycleService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
@@ -60,11 +62,16 @@ public class SpaceService {
         booking.setCapacity(dto.getCapacity());
         booking.setLayout(dto.getLayout());
         booking.setAmenities(dto.getAmenities());
+        Long selectedDivisionId;
         if (currentUser.getRole() == Role.SUPERVISOR && currentUser.getDivisionId() != null) {
-            booking.setDivisionId(currentUser.getDivisionId());
+            selectedDivisionId = currentUser.getDivisionId();
         } else {
-            booking.setDivisionId(dto.getDivisionId());
+            selectedDivisionId = dto.getDivisionId();
         }
+        if (selectedDivisionId != null) {
+            DivisionRules.assertAllowed(selectedDivisionId);
+        }
+        booking.setDivisionId(selectedDivisionId);
         Booking saved = spaceRepository.save(booking);
         requestLifecycleService.initialize(RequestType.BOOKING, saved.getId(), currentUser.getId());
         return saved;
@@ -185,6 +192,7 @@ public class SpaceService {
     }
 
     
+    @Transactional
     public Booking adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
@@ -194,10 +202,23 @@ public class SpaceService {
         if (professional.getRole() != Role.PROFESSIONAL) {
             throw new ApiException("Selected user is not a professional");
         }
+
+        // For bookings, admin can directly assign professional from Under Review
+        Status current = booking.getStatus();
+        if (current == Status.SUBMITTED) {
+            requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.UNDER_REVIEW, admin.getId());
+            booking.setStatus(Status.UNDER_REVIEW);
+            current = Status.UNDER_REVIEW;
+        }
+        if (current != Status.UNDER_REVIEW && current != Status.ASSIGNED_TO_PROFESSIONALS) {
+            throw new ApiException("Booking must be under review before assigning a professional");
+        }
         
         booking.setAssignedProfessionalId(professionalId);
+        if (current == Status.UNDER_REVIEW) {
+            requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
+        }
         booking.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
-        requestLifecycleService.transition(com.org.cmbms.common.enums.RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
         requestLifecycleService.notifyUser(professionalId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
         return spaceRepository.save(booking);
     }
@@ -207,16 +228,83 @@ public class SpaceService {
             throw new ApiException("Access denied");
         }
         Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
-        User supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
-        if (supervisor.getRole() != Role.SUPERVISOR) {
-            throw new ApiException("Selected user is not a supervisor");
+        if (divisionId == null) {
+            throw new ApiException("Division is required");
         }
+        DivisionRules.assertAllowed(divisionId);
+
+        User supervisor;
+        if (supervisorId != null) {
+            supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
+            if (supervisor.getRole() != Role.SUPERVISOR) {
+                throw new ApiException("Selected user is not a supervisor");
+            }
+            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
+                throw new ApiException("Supervisor must belong to selected division");
+            }
+        } else {
+            List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, divisionId);
+            if (supervisors.isEmpty()) {
+                throw new ApiException("No supervisor account found for selected division");
+            }
+            if (supervisors.size() > 1) {
+                throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
+            }
+            supervisor = supervisors.get(0);
+        }
+
         booking.setDivisionId(divisionId);
-        booking.setAssignedSupervisorId(supervisorId);
+        booking.setAssignedSupervisorId(supervisor.getId());
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.UNDER_REVIEW, admin.getId());
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
         booking.setStatus(Status.ASSIGNED_TO_SUPERVISOR);
-        requestLifecycleService.notifyUser(supervisorId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        return spaceRepository.save(booking);
+    }
+    
+    @Transactional
+    public Booking updateBookingCost(Long id, java.math.BigDecimal materialCost, java.math.BigDecimal laborCost, String partsUsed, UserPrincipal professional) {
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Access denied");
+        }
+        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
+        if (!booking.getAssignedProfessionalId().equals(professional.getId())) {
+            throw new ApiException("You are not assigned to this booking");
+        }
+        
+        booking.setMaterialCost(materialCost);
+        booking.setLaborCost(laborCost);
+        booking.setPartsUsed(partsUsed);
+        
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+        if (materialCost != null) total = total.add(materialCost);
+        if (laborCost != null) total = total.add(laborCost);
+        booking.setTotalCost(total);
+        
+        return spaceRepository.save(booking);
+    }
+    
+    @Transactional
+    public Booking professionalUpdateStatus(Long id, String statusStr, UserPrincipal professional) {
+        if (professional.getRole() != Role.PROFESSIONAL) {
+            throw new ApiException("Access denied");
+        }
+        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
+        if (!booking.getAssignedProfessionalId().equals(professional.getId())) {
+            throw new ApiException("You are not assigned to this booking");
+        }
+        
+        Status newStatus;
+        if ("In Progress".equals(statusStr)) {
+            newStatus = Status.IN_PROGRESS;
+        } else if ("Completed".equals(statusStr)) {
+            newStatus = Status.COMPLETED;
+        } else {
+            throw new ApiException("Invalid status");
+        }
+        
+        requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), newStatus, professional.getId());
+        booking.setStatus(newStatus);
         return spaceRepository.save(booking);
     }
 }

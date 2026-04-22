@@ -26,6 +26,8 @@ public class ProfessionalController {
 
     private final WorkflowService workflowService;
     private final FileStorageService fileStorageService;
+    private final com.org.cmbms.project.service.ProjectService projectService;
+    private final com.org.cmbms.space.service.SpaceService spaceService;
 
     @GetMapping("/tasks")
     public ResponseEntity<List<MaintenanceRequest>> tasks() {
@@ -50,5 +52,26 @@ public class ProfessionalController {
                 "filePath", record.getFilePath()
         ));
     }
-}
 
+    @PatchMapping("/tasks/{id}/cost")
+    public ResponseEntity<MaintenanceRequest> updateCost(@PathVariable Long id, @jakarta.validation.Valid @RequestBody com.org.cmbms.maintenance.dto.CostUpdateRequest request) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(workflowService.updateTaskCost(user, id, request));
+    }
+    
+    @PatchMapping("/projects/{id}/cost")
+    public ResponseEntity<?> updateProjectCost(@PathVariable Long id, @jakarta.validation.Valid @RequestBody com.org.cmbms.maintenance.dto.CostUpdateRequest request) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        java.math.BigDecimal materialCost = request.getMaterialCost() != null ? java.math.BigDecimal.valueOf(request.getMaterialCost()) : null;
+        java.math.BigDecimal laborCost = request.getLaborCost() != null ? java.math.BigDecimal.valueOf(request.getLaborCost()) : null;
+        return ResponseEntity.ok(projectService.updateProjectCost(id, materialCost, laborCost, request.getPartsUsed(), user));
+    }
+    
+    @PatchMapping("/bookings/{id}/cost")
+    public ResponseEntity<?> updateBookingCost(@PathVariable Long id, @jakarta.validation.Valid @RequestBody com.org.cmbms.maintenance.dto.CostUpdateRequest request) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        java.math.BigDecimal materialCost = request.getMaterialCost() != null ? java.math.BigDecimal.valueOf(request.getMaterialCost()) : null;
+        java.math.BigDecimal laborCost = request.getLaborCost() != null ? java.math.BigDecimal.valueOf(request.getLaborCost()) : null;
+        return ResponseEntity.ok(spaceService.updateBookingCost(id, materialCost, laborCost, request.getPartsUsed(), user));
+    }
+}

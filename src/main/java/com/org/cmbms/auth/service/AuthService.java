@@ -8,6 +8,7 @@ import com.org.cmbms.auth.jwt.JwtUtil;
 import com.org.cmbms.auth.security.UserPrincipal;
 import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.exception.ApiException;
+import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.user.model.User;
 import com.org.cmbms.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,18 +28,27 @@ public class AuthService {
             throw new ApiException("Email already exists");
         }
         Role role = request.getRole() == null ? Role.USER : request.getRole();
-        if ((role == Role.SUPERVISOR || role == Role.PROFESSIONAL) && request.getDivisionId() == null) {
-            throw new ApiException("divisionId is required for supervisor/professional");
+        if (role == Role.SUPERVISOR && request.getDivisionId() == null) {
+            throw new ApiException("divisionId is required for supervisor");
+        }
+        if (role == Role.SUPERVISOR) {
+            DivisionRules.assertAllowed(request.getDivisionId());
+        }
+        if (role == Role.SUPERVISOR && !userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, request.getDivisionId()).isEmpty()) {
+            throw new ApiException("A supervisor account already exists for this division");
         }
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(role);
-        if (role == Role.ADMIN || role == Role.USER) {
-            user.setDivisionId(null);
-        } else {
+        user.setPhone(request.getPhone());
+        user.setDepartment(request.getDepartment());
+        user.setProfession(role == Role.PROFESSIONAL ? request.getProfession() : null);
+        if (role == Role.SUPERVISOR) {
             user.setDivisionId(request.getDivisionId());
+        } else {
+            user.setDivisionId(null);
         }
         User saved = userRepository.save(user);
         String token = jwtUtil.generateToken(new UserPrincipal(saved));

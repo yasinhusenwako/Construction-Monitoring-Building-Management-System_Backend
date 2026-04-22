@@ -30,6 +30,15 @@ public class User {
     @Column(name = "role", nullable = false)
     private Role role;
 
-    @Column(name = "divisionId")
+    @Column(name = "division_id")
     private Long divisionId;
+
+    @Column(name = "profession")
+    private String profession;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "department")
+    private String department;
 }

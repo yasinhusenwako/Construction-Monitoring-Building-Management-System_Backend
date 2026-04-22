@@ -38,5 +38,13 @@ public class MaintenanceRequest {
     private Long assignedSupervisorId;
     @Column(name = "assignedProfessionalId")
     private Long assignedProfessionalId;
+    @Column(name = "materialCost")
+    private Double materialCost;
+    @Column(name = "laborCost")
+    private Double laborCost;
+    @Column(name = "totalCost")
+    private Double totalCost;
+    @Column(name = "partsUsed", columnDefinition = "TEXT")
+    private String partsUsed;
 }
 

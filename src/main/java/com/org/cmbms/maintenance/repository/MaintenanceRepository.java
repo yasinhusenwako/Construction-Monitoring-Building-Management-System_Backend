@@ -12,5 +12,6 @@ public interface MaintenanceRepository extends JpaRepository<MaintenanceRequest,
     List<MaintenanceRequest> findByDivisionId(Long divisionId);
     List<MaintenanceRequest> findByAssignedSupervisorId(Long supervisorId);
     List<MaintenanceRequest> findByAssignedProfessionalId(Long professionalId);
+    List<MaintenanceRequest> findByCreatedBy(Long createdBy);
     List<MaintenanceRequest> findByStatus(Status status);
 }
