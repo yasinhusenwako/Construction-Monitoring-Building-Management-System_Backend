@@ -40,5 +40,10 @@ public class FileStorageService {
         record.setUploadedAt(LocalDateTime.now());
         return fileRecordRepository.save(record);
     }
+
+    public org.springframework.core.io.Resource getFileAsResource(String filePath) throws IOException {
+        Path path = Paths.get(filePath);
+        return new org.springframework.core.io.UrlResource(path.toUri());
+    }
 }
 

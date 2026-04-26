@@ -26,6 +26,12 @@ public class MaintenanceController {
         return ResponseEntity.ok(maintenanceService.create(request, user));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<MaintenanceRequest> update(@PathVariable Long id, @RequestBody CreateMaintenanceRequestDTO request) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(maintenanceService.update(id, request, user));
+    }
+
     @GetMapping
     public ResponseEntity<List<MaintenanceRequest>> search(@RequestParam(required = false) String status,
                                                            @RequestParam(required = false) String priority,
@@ -34,5 +40,13 @@ public class MaintenanceController {
                                                            @RequestParam(required = false) Long createdBy) {
         UserPrincipal user = SecurityUtils.getCurrentUser();
         return ResponseEntity.ok(maintenanceService.search(user, status, priority, maintenanceId, divisionId, createdBy));
+    }
+
+    @PostMapping("/{id}/upload-doc")
+    public ResponseEntity<com.org.cmbms.maintenance.dto.MaintenanceDocUploadResponse> uploadDoc(@PathVariable("id") Long id,
+                                                                                                @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        com.org.cmbms.file.model.FileRecord record = maintenanceService.uploadDoc(id, file, currentUser.getId());
+        return ResponseEntity.ok(new com.org.cmbms.maintenance.dto.MaintenanceDocUploadResponse(record.getId(), record.getFileName(), record.getFilePath()));
     }
 }

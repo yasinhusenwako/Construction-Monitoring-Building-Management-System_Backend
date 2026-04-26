@@ -77,9 +77,55 @@ public class SpaceService {
         return saved;
     }
 
+    public Booking update(Long id, BookingRequestDTO dto, UserPrincipal currentUser) {
+        Booking booking = spaceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Booking not found"));
+        
+        if (currentUser.getRole() == Role.PROFESSIONAL) {
+            throw new ApiException("Professional cannot update bookings");
+        }
+        
+        if (booking.getStatus() != Status.SUBMITTED && booking.getStatus() != Status.UNDER_REVIEW && currentUser.getRole() != Role.ADMIN) {
+            throw new ApiException("Booking cannot be edited in its current status");
+        }
+        
+        // Ownership check
+        if (currentUser.getRole() != Role.ADMIN && !booking.getRequester().equals(currentUser.getId())) {
+            throw new ApiException("You are not authorized to edit this booking");
+        }
+
+        if (dto.getDateTime() != null && "HALL".equalsIgnoreCase(dto.getType() != null ? dto.getType() : booking.getType())) {
+            LocalDateTime start = dto.getDateTime().minusHours(2);
+            LocalDateTime end = dto.getDateTime().plusHours(2);
+            String hallName = dto.getLayout() == null ? (booking.getLayout() == null ? "DEFAULT_HALL" : booking.getLayout()) : dto.getLayout();
+            List<Booking> conflicts = spaceRepository.findByTypeAndLayoutAndDateTimeBetween("HALL", hallName, start, end);
+            if (conflicts.stream().anyMatch(c -> !c.getId().equals(id))) {
+                throw new ApiException("Hall conflict detected for selected dateTime and hall");
+            }
+        }
+
+        if (dto.getType() != null) booking.setType(dto.getType());
+        if (dto.getDateTime() != null) booking.setDateTime(dto.getDateTime());
+        if (dto.getCapacity() != null) booking.setCapacity(dto.getCapacity());
+        if (dto.getLayout() != null) booking.setLayout(dto.getLayout());
+        if (dto.getAmenities() != null) booking.setAmenities(dto.getAmenities());
+        
+        if (dto.getDivisionId() != null) {
+            DivisionRules.assertAllowed(dto.getDivisionId());
+            booking.setDivisionId(dto.getDivisionId());
+        }
+
+        return spaceRepository.save(booking);
+    }
+
     public List<Booking> all(UserPrincipal currentUser) {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
-            return spaceRepository.findByAssignedProfessionalId(currentUser.getId());
+            // Find by assigned professional OR requester
+            Specification<Booking> spec = (root, query, cb) -> cb.or(
+                    cb.equal(root.get("assignedProfessionalId"), currentUser.getId()),
+                    cb.equal(root.get("requester"), currentUser.getId())
+            );
+            return spaceRepository.findAll(spec);
         }
         if (currentUser.getRole() == Role.ADMIN) {
             return spaceRepository.findAll();
@@ -97,12 +143,15 @@ public class SpaceService {
                                 Long divisionId,
                                 Long requester,
                                 LocalDate date) {
-        if (currentUser.getRole() == Role.PROFESSIONAL) {
-            // For professionals, only return bookings assigned to them
-            return spaceRepository.findByAssignedProfessionalId(currentUser.getId());
-        }
         Specification<Booking> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            
+            if (currentUser.getRole() == Role.PROFESSIONAL) {
+                // For professionals, return bookings assigned to them OR requested by them
+                Predicate isAssigned = cb.equal(root.get("assignedProfessionalId"), currentUser.getId());
+                Predicate isRequester = cb.equal(root.get("requester"), currentUser.getId());
+                predicates.add(cb.or(isAssigned, isRequester));
+            }
             if (status != null && !status.isBlank()) {
                 predicates.add(cb.equal(root.get("status"), Status.fromValue(status)));
             }

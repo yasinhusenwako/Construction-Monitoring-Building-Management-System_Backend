@@ -72,4 +72,7 @@ public class Project {
     
     @Column(name = "partsUsed", columnDefinition = "TEXT")
     private String partsUsed;
+
+    @Column(name = "scope", columnDefinition = "TEXT")
+    private String scope;
 }

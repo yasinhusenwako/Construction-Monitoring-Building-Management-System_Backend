@@ -38,6 +38,7 @@ public class ProjectService {
     private final FileStorageService fileStorageService;
     private final RequestLifecycleService requestLifecycleService;
     private final UserRepository userRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public Project create(ProjectRequestDTO dto, UserPrincipal currentUser) {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
@@ -64,9 +65,67 @@ public class ProjectService {
             DivisionRules.assertAllowed(dto.getDivisionId());
         }
         project.setDivisionId(dto.getDivisionId());
+        
+        if (dto.getScope() != null) {
+            try {
+                project.setScope(objectMapper.writeValueAsString(dto.getScope()));
+            } catch (Exception e) {
+                // ignore or log
+            }
+        }
+        
         Project saved = projectRepository.save(project);
         requestLifecycleService.initialize(RequestType.PROJECT, saved.getId(), currentUser.getId());
         return saved;
+    }
+
+    public Project update(Long id, ProjectRequestDTO dto, UserPrincipal currentUser) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Project not found"));
+        
+        if (currentUser.getRole() == Role.PROFESSIONAL) {
+            throw new ApiException("Professional cannot update projects");
+        }
+        
+        // Only allow update if in SUBMITTED or UNDER_REVIEW status and it's the owner (or admin)
+        if (project.getStatus() != Status.SUBMITTED && project.getStatus() != Status.UNDER_REVIEW && currentUser.getRole() != Role.ADMIN) {
+            throw new ApiException("Project cannot be edited in its current status");
+        }
+        
+        if (currentUser.getRole() != Role.ADMIN && !project.getCreatedBy().equals(currentUser.getId())) {
+            throw new ApiException("You are not authorized to edit this project");
+        }
+
+        if (dto.getTitle() != null) project.setTitle(dto.getTitle());
+        if (dto.getLocation() != null) project.setLocation(dto.getLocation());
+        if (dto.getDepartment() != null) project.setDepartment(dto.getDepartment());
+        if (dto.getContactPerson() != null) project.setContactPerson(dto.getContactPerson());
+        if (dto.getPhone() != null) project.setPhone(dto.getPhone());
+        if (dto.getSiteCondition() != null) project.setSiteCondition(dto.getSiteCondition());
+        if (dto.getDescription() != null) project.setDescription(dto.getDescription());
+        if (dto.getBudget() != null) project.setBudget(dto.getBudget());
+        if (dto.getStartDate() != null) project.setStartDate(dto.getStartDate());
+        if (dto.getEndDate() != null) project.setEndDate(dto.getEndDate());
+        if (dto.getClassification() != null) project.setClassification(dto.getClassification());
+        
+        if (dto.getPriority() != null) {
+            project.setPriority(dto.getPriority());
+        }
+        
+        if (dto.getDivisionId() != null) {
+            DivisionRules.assertAllowed(dto.getDivisionId());
+            project.setDivisionId(dto.getDivisionId());
+        }
+        
+        if (dto.getScope() != null) {
+            try {
+                project.setScope(objectMapper.writeValueAsString(dto.getScope()));
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
+        return projectRepository.save(project);
     }
 
     public BoqResponse submitBoq(String projectId, UserPrincipal currentUser) {

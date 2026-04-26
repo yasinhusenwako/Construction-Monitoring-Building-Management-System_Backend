@@ -27,6 +27,12 @@ public class SpaceController {
         return ResponseEntity.ok(spaceService.create(request, currentUser));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody BookingRequestDTO request) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(spaceService.update(id, request, currentUser));
+    }
+
     @GetMapping
     public ResponseEntity<List<Booking>> all(@RequestParam(required = false) String status,
                                              @RequestParam(required = false) String type,

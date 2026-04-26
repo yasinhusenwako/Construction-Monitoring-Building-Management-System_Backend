@@ -24,6 +24,7 @@ public class MaintenanceService {
 
     private final MaintenanceRepository maintenanceRepository;
     private final WorkflowService workflowService;
+    private final com.org.cmbms.file.service.FileStorageService fileStorageService;
 
     public MaintenanceRequest create(CreateMaintenanceRequestDTO dto, UserPrincipal user) {
         MaintenanceRequest request = new MaintenanceRequest();
@@ -41,6 +42,40 @@ public class MaintenanceService {
         MaintenanceRequest saved = maintenanceRepository.save(request);
         workflowService.initializeSubmittedStatus(saved, user.getId());
         return maintenanceRepository.save(saved);
+    }
+
+    public com.org.cmbms.file.model.FileRecord uploadDoc(Long id, org.springframework.web.multipart.MultipartFile file, Long userId) throws java.io.IOException {
+        return fileStorageService.save(id, "MAINTENANCE_DOC", file, userId);
+    }
+
+    public MaintenanceRequest update(Long id, CreateMaintenanceRequestDTO dto, UserPrincipal user) {
+        MaintenanceRequest request = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        
+        if (user.getRole() == Role.PROFESSIONAL) {
+            throw new ApiException("Professional cannot update maintenance requests");
+        }
+        
+        if (request.getStatus() != Status.SUBMITTED && request.getStatus() != Status.UNDER_REVIEW && user.getRole() != Role.ADMIN) {
+            throw new ApiException("Maintenance request cannot be edited in its current status");
+        }
+        
+        // Ownership check
+        if (user.getRole() != Role.ADMIN && !request.getCreatedBy().equals(user.getId())) {
+            throw new ApiException("You are not authorized to edit this request");
+        }
+
+        if (dto.getCategory() != null) request.setCategory(dto.getCategory());
+        if (dto.getPriority() != null) request.setPriority(dto.getPriority());
+        if (dto.getDescription() != null) request.setDescription(dto.getDescription());
+        if (dto.getLocation() != null) request.setLocation(dto.getLocation());
+        
+        if (dto.getDivisionId() != null) {
+            DivisionRules.assertAllowed(dto.getDivisionId());
+            request.setDivisionId(dto.getDivisionId());
+        }
+
+        return maintenanceRepository.save(request);
     }
 
     public List<MaintenanceRequest> search(UserPrincipal user,

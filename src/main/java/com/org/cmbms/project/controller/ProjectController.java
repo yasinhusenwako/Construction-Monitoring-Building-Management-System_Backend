@@ -34,6 +34,12 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.create(request, currentUser));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<Project> update(@PathVariable Long id, @RequestBody ProjectRequestDTO request) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(projectService.update(id, request, currentUser));
+    }
+
     @GetMapping
     public ResponseEntity<List<Project>> all(@RequestParam(required = false) String status,
                                              @RequestParam(required = false) String priority,

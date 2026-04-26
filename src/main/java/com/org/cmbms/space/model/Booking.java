@@ -31,7 +31,7 @@ public class Booking {
     private Integer capacity;
     @Column(name = "layout")
     private String layout;
-    @Column(name = "amenities")
+    @Column(name = "amenities", columnDefinition = "TEXT")
     private String amenities;
     @Column(name = "divisionId")
     private Long divisionId;

@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "USER", "SUPERVISOR", "PROFESSIONAL")
                         .requestMatchers("/api/users/**").authenticated()
                         .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "SUPERVISOR")
+                        .requestMatchers("/api/preventive-schedules/**").hasAnyRole("ADMIN", "SUPERVISOR", "PROFESSIONAL")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

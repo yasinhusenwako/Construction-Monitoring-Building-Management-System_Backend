@@ -46,6 +46,8 @@ public class RequestLifecycleService {
 
     private final StatusHistoryRepository statusHistoryRepository;
     private final NotificationRepository notificationRepository;
+    private final com.org.cmbms.history.service.RequestHistoryService requestHistoryService;
+    private final com.org.cmbms.user.repository.UserRepository userRepository;
 
     private Map<Status, EnumSet<Status>> getTransitions(RequestType type) {
         if (type == RequestType.MAINTENANCE) {
@@ -63,6 +65,7 @@ public class RequestLifecycleService {
         history.setChangedBy(changedBy);
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
+        recordRequestHistory(requestId, type, Status.SUBMITTED, changedBy, "Request Created", null);
     }
 
     @Transactional
@@ -74,6 +77,8 @@ public class RequestLifecycleService {
         history.setChangedBy(0L); // System/USER
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
+        
+        recordRequestHistory(projectId, RequestType.PROJECT, Status.SUBMITTED, 0L, "Request Created", null);
     }
 
     @Transactional
@@ -85,6 +90,8 @@ public class RequestLifecycleService {
         history.setChangedBy(0L); // System/USER
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
+
+        recordRequestHistory(bookingId, RequestType.BOOKING, Status.SUBMITTED, 0L, "Request Created", null);
     }
 
     @Transactional
@@ -108,10 +115,35 @@ public class RequestLifecycleService {
         history.setChangedBy(changedBy);
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
+
+        recordRequestHistory(requestId, type, next, changedBy, "Status Updated", null);
+    }
+
+    public void recordNote(RequestType type, Long requestId, Long actorId, String note) {
+        Status current = getCurrentStatus(type, requestId);
+        recordRequestHistory(requestId, type, current, actorId, "Note Added", note);
+    }
+
+    private void recordRequestHistory(Long requestId, RequestType type, Status status, Long changedBy, String action, String note) {
+        String actorName = "System";
+        if (changedBy != null && changedBy > 0) {
+            actorName = userRepository.findById(changedBy)
+                    .map(com.org.cmbms.user.model.User::getName)
+                    .orElse("Unknown User");
+        }
+        requestHistoryService.recordHistory(
+                requestId,
+                type.name(),
+                action,
+                status != null ? status.getValue() : null,
+                actorName,
+                changedBy,
+                note
+        );
     }
 
     public Status getCurrentStatus(RequestType type, Long requestId) {
-        List<StatusHistory> history = statusHistoryRepository.findByRequestTypeAndRequestId(type, requestId);
+        List<StatusHistory> history = statusHistoryRepository.findByRequestTypeAndRequestIdOrderByTimestampAsc(type, requestId);
         if (history.isEmpty()) {
             return null;
         }

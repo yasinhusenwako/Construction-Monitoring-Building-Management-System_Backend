@@ -38,5 +38,6 @@ public class ProjectRequestDTO {
     @NotBlank
     private String priority;
     private Long divisionId;
+    private Object scope;
 }
 
