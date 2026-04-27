@@ -376,30 +376,6 @@ public class SpaceService {
         booking.setStatus(newStatus);
         return spaceRepository.save(booking);
     }
-
-    @Transactional
-    public Booking update(Long id, BookingRequestDTO dto, UserPrincipal currentUser) {
-        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
-        
-        // Only creator can edit
-        if (!booking.getRequester().equals(currentUser.getId())) {
-            throw new ApiException("You can only edit your own bookings");
-        }
-        
-        // Only allow editing in Submitted status
-        if (booking.getStatus() != Status.SUBMITTED) {
-            throw new ApiException("You can only edit bookings in Submitted status");
-        }
-        
-        // Update fields
-        booking.setType(dto.getType());
-        booking.setDateTime(dto.getDateTime());
-        booking.setCapacity(dto.getCapacity());
-        booking.setLayout(dto.getLayout());
-        booking.setAmenities(dto.getAmenities());
-        
-        return spaceRepository.save(booking);
-    }
     
     @Transactional
     public void delete(Long id, UserPrincipal currentUser) {

@@ -94,12 +94,6 @@ public class SpaceController {
         return ResponseEntity.ok(spaceService.adminAssignProfessional(id, professionalId, instructions, currentUser));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Booking> update(@PathVariable Long id, @Valid @RequestBody BookingRequestDTO request) {
-        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(spaceService.update(id, request, currentUser));
-    }
-
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();

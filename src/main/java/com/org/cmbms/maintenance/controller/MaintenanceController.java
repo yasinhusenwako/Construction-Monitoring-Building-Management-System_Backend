@@ -63,12 +63,6 @@ public class MaintenanceController {
         return ResponseEntity.ok(maintenanceService.adminReject(id, reason, user));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<MaintenanceRequest> update(@PathVariable Long id, @Valid @RequestBody CreateMaintenanceRequestDTO request) {
-        UserPrincipal user = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(maintenanceService.update(id, request, user));
-    }
-
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         UserPrincipal user = SecurityUtils.getCurrentUser();

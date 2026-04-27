@@ -72,11 +72,7 @@ public class ProjectService {
         project.setDivisionId(dto.getDivisionId());
         
         if (dto.getScope() != null) {
-            try {
-                project.setScope(objectMapper.writeValueAsString(dto.getScope()));
-            } catch (Exception e) {
-                // ignore or log
-            }
+            project.setScope(dto.getScope());
         }
         
         Project saved = projectRepository.save(project);

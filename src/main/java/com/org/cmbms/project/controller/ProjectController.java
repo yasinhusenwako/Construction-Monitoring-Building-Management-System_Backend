@@ -116,12 +116,6 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.adminAssignProfessional(id, professionalId, instructions, currentUser));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Project> update(@PathVariable Long id, @Valid @RequestBody ProjectRequestDTO request) {
-        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(projectService.update(id, request, currentUser));
-    }
-
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();

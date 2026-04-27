@@ -162,29 +162,6 @@ public class MaintenanceService {
         return maintenanceRepository.save(maintenance);
     }
 
-    public MaintenanceRequest update(Long id, CreateMaintenanceRequestDTO dto, UserPrincipal user) {
-        MaintenanceRequest request = maintenanceRepository.findById(id)
-                .orElseThrow(() -> new ApiException("Maintenance request not found"));
-        
-        // Only creator can edit
-        if (!request.getCreatedBy().equals(user.getId())) {
-            throw new ApiException("You can only edit your own maintenance requests");
-        }
-        
-        // Only allow editing in Submitted status
-        if (request.getStatus() != Status.SUBMITTED) {
-            throw new ApiException("You can only edit maintenance requests in Submitted status");
-        }
-        
-        // Update fields
-        request.setCategory(dto.getCategory());
-        request.setPriority(dto.getPriority());
-        request.setDescription(dto.getDescription());
-        request.setLocation(dto.getLocation());
-        
-        return maintenanceRepository.save(request);
-    }
-
     @Transactional
     public void delete(Long id, UserPrincipal currentUser) {
         MaintenanceRequest maintenance = maintenanceRepository.findById(id)
