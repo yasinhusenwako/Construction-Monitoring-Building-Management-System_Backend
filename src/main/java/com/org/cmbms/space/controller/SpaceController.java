@@ -67,9 +67,10 @@ public class SpaceController {
     }
 
     @PatchMapping("/{id}/reject")
-    public ResponseEntity<Booking> reject(@PathVariable Long id) {
+    public ResponseEntity<Booking> reject(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(spaceService.adminReject(id, currentUser));
+        String reason = body.get("reason");
+        return ResponseEntity.ok(spaceService.adminReject(id, reason, currentUser));
     }
 
     @PatchMapping("/{id}/close")
@@ -83,5 +84,26 @@ public class SpaceController {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
         String status = body.get("status");
         return ResponseEntity.ok(spaceService.professionalUpdateStatus(id, status, currentUser));
+    }
+
+    @PostMapping("/{id}/assign-professional")
+    public ResponseEntity<Booking> assignProfessional(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        Long professionalId = Long.valueOf(body.get("professionalId").toString());
+        String instructions = body.get("instructions") != null ? body.get("instructions").toString() : "";
+        return ResponseEntity.ok(spaceService.adminAssignProfessional(id, professionalId, instructions, currentUser));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Booking> update(@PathVariable Long id, @Valid @RequestBody BookingRequestDTO request) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(spaceService.update(id, request, currentUser));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        spaceService.delete(id, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }

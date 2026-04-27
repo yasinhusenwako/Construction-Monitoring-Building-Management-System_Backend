@@ -89,9 +89,10 @@ public class ProjectController {
     }
 
     @PatchMapping("/{id}/reject")
-    public ResponseEntity<Project> reject(@PathVariable Long id) {
+    public ResponseEntity<Project> reject(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(projectService.adminReject(id, currentUser));
+        String reason = body.get("reason");
+        return ResponseEntity.ok(projectService.adminReject(id, reason, currentUser));
     }
 
     @PatchMapping("/{id}/close")
@@ -105,6 +106,27 @@ public class ProjectController {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
         String status = body.get("status");
         return ResponseEntity.ok(projectService.professionalUpdateStatus(id, status, currentUser));
+    }
+
+    @PostMapping("/{id}/assign-professional")
+    public ResponseEntity<Project> assignProfessional(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        Long professionalId = Long.valueOf(body.get("professionalId").toString());
+        String instructions = body.get("instructions") != null ? body.get("instructions").toString() : "";
+        return ResponseEntity.ok(projectService.adminAssignProfessional(id, professionalId, instructions, currentUser));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Project> update(@PathVariable Long id, @Valid @RequestBody ProjectRequestDTO request) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(projectService.update(id, request, currentUser));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        projectService.delete(id, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }
 

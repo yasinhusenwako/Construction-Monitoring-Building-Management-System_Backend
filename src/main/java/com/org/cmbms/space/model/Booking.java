@@ -23,6 +23,8 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private Status status;
+    @Column(name = "rejectionReason", columnDefinition = "TEXT")
+    private String rejectionReason;
     @Column(name = "requester")
     private Long requester;
     @Column(name = "dateTime")

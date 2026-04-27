@@ -5,10 +5,13 @@ import com.org.cmbms.common.enums.Status;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Table(name = "projects")
@@ -24,6 +27,10 @@ public class Project {
     private String title;
     @Column(name = "location")
     private String location;
+    @Column(name = "block")
+    private String block;
+    @Column(name = "floor")
+    private String floor;
     @Column(name = "department")
     private String department;
     @Column(name = "contactPerson")
@@ -47,6 +54,8 @@ public class Project {
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private Status status;
+    @Column(name = "rejectionReason", columnDefinition = "TEXT")
+    private String rejectionReason;
     @Column(name = "createdBy")
     private Long createdBy;
     @Column(name = "createdAt")
@@ -73,6 +82,13 @@ public class Project {
     @Column(name = "partsUsed", columnDefinition = "TEXT")
     private String partsUsed;
 
-    @Column(name = "scope", columnDefinition = "TEXT")
-    private String scope;
+    @Column(name = "requestMode")
+    private String requestMode;
+
+    @Column(name = "linkedProjectId")
+    private String linkedProjectId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "scope", columnDefinition = "jsonb")
+    private Map<String, Object> scope;
 }

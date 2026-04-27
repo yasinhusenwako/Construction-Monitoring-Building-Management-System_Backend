@@ -218,14 +218,19 @@ public class SpaceService {
         return spaceRepository.save(booking);
     }
 
-    public Booking adminReject(Long id, UserPrincipal admin) {
+    public Booking adminReject(Long id, String reason, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
         Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
         booking.setStatus(Status.REJECTED);
+        booking.setRejectionReason(reason);
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.REJECTED, admin.getId());
-        requestLifecycleService.notifyUser(booking.getRequester(), "Booking rejected", "Booking " + booking.getBookingId() + " rejected");
+        String notificationMessage = "Booking " + booking.getBookingId() + " rejected";
+        if (reason != null && !reason.isBlank()) {
+            notificationMessage += ". Reason: " + reason;
+        }
+        requestLifecycleService.notifyUser(booking.getRequester(), "Booking rejected", notificationMessage);
         return spaceRepository.save(booking);
     }
 
@@ -252,6 +257,13 @@ public class SpaceService {
             throw new ApiException("Selected user is not a professional");
         }
 
+        System.out.println("=== ASSIGNING BOOKING TO PROFESSIONAL ===");
+        System.out.println("Booking ID: " + booking.getId());
+        System.out.println("Booking Business ID: " + booking.getBookingId());
+        System.out.println("Professional ID: " + professionalId);
+        System.out.println("Professional Name: " + professional.getName());
+        System.out.println("Current Status: " + booking.getStatus());
+
         // For bookings, admin can directly assign professional from Under Review
         Status current = booking.getStatus();
         if (current == Status.SUBMITTED) {
@@ -268,7 +280,15 @@ public class SpaceService {
             requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
         }
         booking.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+        
+        System.out.println("New Status: " + booking.getStatus());
+        System.out.println("Assigned Professional ID: " + booking.getAssignedProfessionalId());
+        
         requestLifecycleService.notifyUser(professionalId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        
+        System.out.println("Notification sent to professional");
+        System.out.println("=== ASSIGNMENT COMPLETE ===");
+        
         return spaceRepository.save(booking);
     }
 
@@ -355,5 +375,57 @@ public class SpaceService {
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), newStatus, professional.getId());
         booking.setStatus(newStatus);
         return spaceRepository.save(booking);
+    }
+
+    @Transactional
+    public Booking update(Long id, BookingRequestDTO dto, UserPrincipal currentUser) {
+        Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
+        
+        // Only creator can edit
+        if (!booking.getRequester().equals(currentUser.getId())) {
+            throw new ApiException("You can only edit your own bookings");
+        }
+        
+        // Only allow editing in Submitted status
+        if (booking.getStatus() != Status.SUBMITTED) {
+            throw new ApiException("You can only edit bookings in Submitted status");
+        }
+        
+        // Update fields
+        booking.setType(dto.getType());
+        booking.setDateTime(dto.getDateTime());
+        booking.setCapacity(dto.getCapacity());
+        booking.setLayout(dto.getLayout());
+        booking.setAmenities(dto.getAmenities());
+        
+        return spaceRepository.save(booking);
+    }
+    
+    @Transactional
+    public void delete(Long id, UserPrincipal currentUser) {
+        Booking booking = spaceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Booking not found"));
+        
+        // Users can only delete their own requests in Submitted status
+        // Admins can delete any request
+        if (currentUser.getRole() == Role.USER) {
+            if (!booking.getRequester().equals(currentUser.getId())) {
+                throw new ApiException("You can only delete your own requests");
+            }
+            if (booking.getStatus() != Status.SUBMITTED) {
+                throw new ApiException("You can only delete requests in Submitted status");
+            }
+        } else if (currentUser.getRole() != Role.ADMIN) {
+            throw new ApiException("Only users and admins can delete requests");
+        }
+        
+        System.out.println("=== DELETING BOOKING ===");
+        System.out.println("Booking ID: " + booking.getId());
+        System.out.println("Booking Business ID: " + booking.getBookingId());
+        System.out.println("Deleted by: " + currentUser.getUsername() + " (Role: " + currentUser.getRole() + ")");
+        
+        spaceRepository.delete(booking);
+        
+        System.out.println("=== BOOKING DELETED ===");
     }
 }

@@ -28,6 +28,8 @@ public class MaintenanceRequest {
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private Status status;
+    @Column(name = "rejectionReason", columnDefinition = "TEXT")
+    private String rejectionReason;
     @Column(name = "createdBy")
     private Long createdBy;
     @Column(name = "createdAt")
