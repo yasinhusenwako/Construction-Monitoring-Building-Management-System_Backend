@@ -47,6 +47,8 @@ public class ProjectService {
         project.setProjectId(dto.getProjectId());
         project.setTitle(dto.getTitle());
         project.setLocation(dto.getLocation());
+        project.setBlock(dto.getBlock());
+        project.setFloor(dto.getFloor());
         project.setDepartment(dto.getDepartment());
         project.setContactPerson(dto.getContactPerson());
         project.setPhone(dto.getPhone());
@@ -57,6 +59,9 @@ public class ProjectService {
         project.setEndDate(dto.getEndDate());
         project.setClassification(dto.getClassification());
         project.setPriority(dto.getPriority());
+        project.setRequestMode(dto.getRequestMode());
+        project.setLinkedProjectId(dto.getLinkedProjectId());
+        project.setScope(dto.getScope());
         project.setStatus(Status.SUBMITTED);
         project.setCreatedBy(currentUser.getId());
         project.setCreatedAt(LocalDateTime.now());
@@ -67,6 +72,95 @@ public class ProjectService {
         Project saved = projectRepository.save(project);
         requestLifecycleService.initialize(RequestType.PROJECT, saved.getId(), currentUser.getId());
         return saved;
+    }
+
+    @Transactional
+    public Project update(Long id, ProjectRequestDTO dto, UserPrincipal currentUser) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Project not found"));
+        
+        // Only the creator can edit, and only if status is SUBMITTED
+        if (!project.getCreatedBy().equals(currentUser.getId())) {
+            throw new ApiException("You can only edit your own requests");
+        }
+        if (project.getStatus() != Status.SUBMITTED) {
+            throw new ApiException("Can only edit requests in Submitted status");
+        }
+        
+        // Update fields - keep existing values if new ones are null/empty
+        if (dto.getTitle() != null && !dto.getTitle().isBlank()) {
+            project.setTitle(dto.getTitle());
+        }
+        if (dto.getDescription() != null && !dto.getDescription().isBlank()) {
+            project.setDescription(dto.getDescription());
+        }
+        if (dto.getClassification() != null && !dto.getClassification().isBlank()) {
+            project.setClassification(dto.getClassification());
+        }
+        if (dto.getLocation() != null && !dto.getLocation().isBlank()) {
+            project.setLocation(dto.getLocation());
+        }
+        if (dto.getBudget() != null) {
+            project.setBudget(dto.getBudget());
+        }
+        if (dto.getStartDate() != null) {
+            project.setStartDate(dto.getStartDate());
+        }
+        if (dto.getEndDate() != null) {
+            project.setEndDate(dto.getEndDate());
+        }
+        if (dto.getDepartment() != null) {
+            project.setDepartment(dto.getDepartment());
+        }
+        if (dto.getContactPerson() != null) {
+            project.setContactPerson(dto.getContactPerson());
+        }
+        if (dto.getPhone() != null) {
+            project.setPhone(dto.getPhone());
+        }
+        if (dto.getSiteCondition() != null) {
+            project.setSiteCondition(dto.getSiteCondition());
+        }
+        if (dto.getBlock() != null) {
+            project.setBlock(dto.getBlock());
+        }
+        if (dto.getFloor() != null) {
+            project.setFloor(dto.getFloor());
+        }
+        // IMPORTANT: Update scope field which contains classification-specific data
+        if (dto.getScope() != null) {
+            project.setScope(dto.getScope());
+        }
+        
+        return projectRepository.save(project);
+    }
+
+    @Transactional
+    public void delete(Long id, UserPrincipal currentUser) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Project not found"));
+        
+        // Users can only delete their own requests in Submitted status
+        // Admins can delete any request
+        if (currentUser.getRole() == Role.USER) {
+            if (!project.getCreatedBy().equals(currentUser.getId())) {
+                throw new ApiException("You can only delete your own requests");
+            }
+            if (project.getStatus() != Status.SUBMITTED) {
+                throw new ApiException("You can only delete requests in Submitted status");
+            }
+        } else if (currentUser.getRole() != Role.ADMIN) {
+            throw new ApiException("Only users and admins can delete requests");
+        }
+        
+        System.out.println("=== DELETING PROJECT ===");
+        System.out.println("Project ID: " + project.getId());
+        System.out.println("Project Business ID: " + project.getProjectId());
+        System.out.println("Deleted by: " + currentUser.getUsername() + " (Role: " + currentUser.getRole() + ")");
+        
+        projectRepository.delete(project);
+        
+        System.out.println("=== PROJECT DELETED ===");
     }
 
     public BoqResponse submitBoq(String projectId, UserPrincipal currentUser) {
@@ -189,14 +283,19 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    public Project adminReject(Long id, UserPrincipal admin) {
+    public Project adminReject(Long id, String reason, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
         project.setStatus(Status.REJECTED);
+        project.setRejectionReason(reason);
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.REJECTED, admin.getId());
-        requestLifecycleService.notifyUser(project.getCreatedBy(), "Project rejected", "Project " + project.getProjectId() + " rejected");
+        String notificationMessage = "Project " + project.getProjectId() + " rejected";
+        if (reason != null && !reason.isBlank()) {
+            notificationMessage += ". Reason: " + reason;
+        }
+        requestLifecycleService.notifyUser(project.getCreatedBy(), "Project rejected", notificationMessage);
         return projectRepository.save(project);
     }
 
@@ -222,6 +321,13 @@ public class ProjectService {
             throw new ApiException("Selected user is not a professional");
         }
 
+        System.out.println("=== ASSIGNING PROJECT TO PROFESSIONAL ===");
+        System.out.println("Project ID: " + project.getId());
+        System.out.println("Project Business ID: " + project.getProjectId());
+        System.out.println("Professional ID: " + professionalId);
+        System.out.println("Professional Name: " + professional.getName());
+        System.out.println("Current Status: " + project.getStatus());
+
         // For projects, admin can directly assign professional from Under Review
         Status current = project.getStatus();
         if (current == Status.SUBMITTED) {
@@ -238,7 +344,15 @@ public class ProjectService {
             requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_PROFESSIONALS, admin.getId());
         }
         project.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+        
+        System.out.println("New Status: " + project.getStatus());
+        System.out.println("Assigned Professional ID: " + project.getAssignedProfessionalId());
+        
         requestLifecycleService.notifyUser(professionalId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        
+        System.out.println("Notification sent to professional");
+        System.out.println("=== ASSIGNMENT COMPLETE ===");
+        
         return projectRepository.save(project);
     }
 

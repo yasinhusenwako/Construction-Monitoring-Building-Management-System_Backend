@@ -13,6 +13,7 @@ import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -89,5 +90,116 @@ public class MaintenanceService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         return maintenanceRepository.findAll(spec);
+    }
+
+    @Transactional
+    public MaintenanceRequest adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        MaintenanceRequest maintenance = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        
+        System.out.println("=== ASSIGNING MAINTENANCE TO PROFESSIONAL ===");
+        System.out.println("Maintenance ID: " + maintenance.getId());
+        System.out.println("Maintenance Business ID: " + maintenance.getMaintenanceId());
+        System.out.println("Professional ID: " + professionalId);
+        System.out.println("Current Status: " + maintenance.getStatus());
+
+        // For maintenance, admin can directly assign professional from Submitted or Under Review
+        Status current = maintenance.getStatus();
+        if (current == Status.SUBMITTED) {
+            maintenance.setStatus(Status.UNDER_REVIEW);
+            current = Status.UNDER_REVIEW;
+        }
+        if (current != Status.UNDER_REVIEW && current != Status.ASSIGNED_TO_PROFESSIONALS) {
+            throw new ApiException("Maintenance must be under review before assigning a professional");
+        }
+        
+        maintenance.setAssignedProfessionalId(professionalId);
+        maintenance.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
+        
+        System.out.println("New Status: " + maintenance.getStatus());
+        System.out.println("Assigned Professional ID: " + maintenance.getAssignedProfessionalId());
+        System.out.println("Notification sent to professional");
+        System.out.println("=== ASSIGNMENT COMPLETE ===");
+        
+        return maintenanceRepository.save(maintenance);
+    }
+
+    public MaintenanceRequest update(Long id, CreateMaintenanceRequestDTO dto, UserPrincipal user) {
+        MaintenanceRequest request = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        
+        // Only creator can edit
+        if (!request.getCreatedBy().equals(user.getId())) {
+            throw new ApiException("You can only edit your own maintenance requests");
+        }
+        
+        // Only allow editing in Submitted status
+        if (request.getStatus() != Status.SUBMITTED) {
+            throw new ApiException("You can only edit maintenance requests in Submitted status");
+        }
+        
+        // Update fields
+        request.setCategory(dto.getCategory());
+        request.setPriority(dto.getPriority());
+        request.setDescription(dto.getDescription());
+        request.setLocation(dto.getLocation());
+        
+        return maintenanceRepository.save(request);
+    }
+
+    @Transactional
+    public void delete(Long id, UserPrincipal currentUser) {
+        MaintenanceRequest maintenance = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        
+        // Users can only delete their own requests in Submitted status
+        // Admins can delete any request
+        if (currentUser.getRole() == Role.USER) {
+            if (!maintenance.getCreatedBy().equals(currentUser.getId())) {
+                throw new ApiException("You can only delete your own requests");
+            }
+            if (maintenance.getStatus() != Status.SUBMITTED) {
+                throw new ApiException("You can only delete requests in Submitted status");
+            }
+        } else if (currentUser.getRole() != Role.ADMIN) {
+            throw new ApiException("Only users and admins can delete requests");
+        }
+        
+        System.out.println("=== DELETING MAINTENANCE ===");
+        System.out.println("Maintenance ID: " + maintenance.getId());
+        System.out.println("Maintenance Business ID: " + maintenance.getMaintenanceId());
+        System.out.println("Deleted by: " + currentUser.getUsername() + " (Role: " + currentUser.getRole() + ")");
+        
+        maintenanceRepository.delete(maintenance);
+        
+        System.out.println("=== MAINTENANCE DELETED ===");
+    }
+
+    public MaintenanceRequest adminApprove(Long id, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        MaintenanceRequest maintenance = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        maintenance.setStatus(Status.APPROVED);
+        return maintenanceRepository.save(maintenance);
+    }
+
+    public MaintenanceRequest adminReject(Long id, String reason, UserPrincipal admin) {
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
+        MaintenanceRequest maintenance = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        maintenance.setStatus(Status.REJECTED);
+        maintenance.setRejectionReason(reason);
+        String notificationMessage = "Maintenance request " + maintenance.getMaintenanceId() + " rejected";
+        if (reason != null && !reason.isBlank()) {
+            notificationMessage += ". Reason: " + reason;
+        }
+        return maintenanceRepository.save(maintenance);
     }
 }

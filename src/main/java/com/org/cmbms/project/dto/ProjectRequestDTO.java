@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -17,6 +18,8 @@ public class ProjectRequestDTO {
     private String title;
     @NotBlank
     private String location;
+    private String block;
+    private String floor;
     @NotBlank
     private String department;
     @NotBlank
@@ -38,5 +41,8 @@ public class ProjectRequestDTO {
     @NotBlank
     private String priority;
     private Long divisionId;
+    private String requestMode;
+    private String linkedProjectId;
+    private Map<String, Object> scope;
 }
 

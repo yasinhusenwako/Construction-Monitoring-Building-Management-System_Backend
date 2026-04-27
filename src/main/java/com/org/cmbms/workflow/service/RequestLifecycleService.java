@@ -22,8 +22,8 @@ public class RequestLifecycleService {
 
     // Maintenance workflow: requires supervisor assignment
     private static final Map<Status, EnumSet<Status>> MAINTENANCE_TRANSITIONS = Map.of(
-            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW),
-            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_SUPERVISOR),
+            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW, Status.APPROVED, Status.REJECTED),
+            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_SUPERVISOR, Status.APPROVED, Status.REJECTED),
             Status.ASSIGNED_TO_SUPERVISOR, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS),
             Status.ASSIGNED_TO_PROFESSIONALS, EnumSet.of(Status.IN_PROGRESS),
             Status.IN_PROGRESS, EnumSet.of(Status.COMPLETED),
@@ -35,8 +35,8 @@ public class RequestLifecycleService {
 
     // Project/Booking workflow: admin can directly assign professional
     private static final Map<Status, EnumSet<Status>> PROJECT_BOOKING_TRANSITIONS = Map.of(
-            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW),
-            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS),
+            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW, Status.APPROVED, Status.REJECTED),
+            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS, Status.APPROVED, Status.REJECTED),
             Status.ASSIGNED_TO_PROFESSIONALS, EnumSet.of(Status.IN_PROGRESS),
             Status.IN_PROGRESS, EnumSet.of(Status.COMPLETED),
             Status.COMPLETED, EnumSet.of(Status.APPROVED, Status.REJECTED),
