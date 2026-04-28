@@ -116,7 +116,7 @@ public class RequestLifecycleService {
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
 
-        recordRequestHistory(requestId, type, next, changedBy, "Status Updated", null);
+        recordRequestHistory(requestId, type, next, changedBy, next.getValue(), null);
     }
 
     public void recordNote(RequestType type, Long requestId, Long actorId, String note) {
