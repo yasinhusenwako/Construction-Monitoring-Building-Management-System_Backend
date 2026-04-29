@@ -18,6 +18,7 @@ public class BookingRequestDTO {
     private Long requester;
     @NotNull
     private LocalDateTime dateTime;
+    private LocalDateTime endTime;
     @NotNull
     private Integer capacity;
     @NotBlank

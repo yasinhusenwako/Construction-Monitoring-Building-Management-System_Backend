@@ -138,6 +138,9 @@ public class ProjectService {
             project.setScope(dto.getScope());
         }
         
+        // Add timeline event for the edit
+        requestLifecycleService.recordNote(RequestType.PROJECT, project.getId(), currentUser.getId(), "Project details were updated");
+        
         return projectRepository.save(project);
     }
 

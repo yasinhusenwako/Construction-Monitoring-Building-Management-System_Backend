@@ -29,6 +29,8 @@ public class Booking {
     private Long requester;
     @Column(name = "dateTime")
     private LocalDateTime dateTime;
+    @Column(name = "endTime")
+    private LocalDateTime endTime;
     @Column(name = "capacity")
     private Integer capacity;
     @Column(name = "layout")

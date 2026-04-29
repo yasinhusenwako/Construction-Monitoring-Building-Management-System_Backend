@@ -66,7 +66,26 @@ public class AuthService {
     }
 
     public String forgotPassword(String email) {
-        userRepository.findByEmail(email).orElseThrow(() -> new ApiException("User not found"));
-        return "Password reset request accepted";
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApiException("If this email is registered, you will receive a password reset link"));
+        
+        // TODO: In production, implement the following:
+        // 1. Generate a unique password reset token
+        // 2. Store the token with expiration time (e.g., 1 hour)
+        // 3. Send email with reset link containing the token
+        // 4. Create a reset-password endpoint to handle the token validation and password update
+        
+        // For now, return a success message
+        // In production, always return the same message regardless of whether email exists (security best practice)
+        return "If this email is registered, you will receive a password reset link shortly";
     }
+    
+    // TODO: Add these methods for complete password reset functionality:
+    // public String resetPassword(String token, String newPassword) {
+    //     // 1. Validate token exists and not expired
+    //     // 2. Get user associated with token
+    //     // 3. Update user password
+    //     // 4. Invalidate/delete the token
+    //     // 5. Return success message
+    // }
 }

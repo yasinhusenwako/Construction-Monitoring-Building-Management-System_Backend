@@ -59,6 +59,7 @@ public class SpaceService {
         booking.setStatus(Status.SUBMITTED);
         booking.setRequester(dto.getRequester());
         booking.setDateTime(dto.getDateTime());
+        booking.setEndTime(dto.getEndTime());
         booking.setCapacity(dto.getCapacity());
         booking.setLayout(dto.getLayout());
         booking.setAmenities(dto.getAmenities());
@@ -106,6 +107,7 @@ public class SpaceService {
 
         if (dto.getType() != null) booking.setType(dto.getType());
         if (dto.getDateTime() != null) booking.setDateTime(dto.getDateTime());
+        if (dto.getEndTime() != null) booking.setEndTime(dto.getEndTime());
         if (dto.getCapacity() != null) booking.setCapacity(dto.getCapacity());
         if (dto.getLayout() != null) booking.setLayout(dto.getLayout());
         if (dto.getAmenities() != null) booking.setAmenities(dto.getAmenities());
