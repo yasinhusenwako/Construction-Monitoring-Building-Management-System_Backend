@@ -12,9 +12,9 @@ public class AssignSupervisorRequest {
     @JsonAlias("maintenanceRequestId")
     private Long requestId;
     @NotNull
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
     @NotNull
-    private Long supervisorId;
+    private String supervisorId; // Changed to String to support both numeric IDs and email identifiers
     private String priority;
 }
 

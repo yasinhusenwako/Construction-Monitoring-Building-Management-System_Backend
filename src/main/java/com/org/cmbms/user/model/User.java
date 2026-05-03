@@ -31,7 +31,7 @@ public class User {
     private Role role;
 
     @Column(name = "division_id")
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
 
     @Column(name = "profession")
     private String profession;

@@ -37,7 +37,7 @@ public class SpaceController {
     public ResponseEntity<List<Booking>> all(@RequestParam(required = false) String status,
                                              @RequestParam(required = false) String type,
                                              @RequestParam(required = false) String bookingId,
-                                             @RequestParam(required = false) Long divisionId,
+                                             @RequestParam(required = false) String divisionId,
                                              @RequestParam(required = false) Long requester,
                                              @RequestParam(required = false) LocalDate date) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
@@ -89,7 +89,7 @@ public class SpaceController {
     @PostMapping("/{id}/assign-professional")
     public ResponseEntity<Booking> assignProfessional(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        Long professionalId = Long.valueOf(body.get("professionalId").toString());
+        String professionalId = body.get("professionalId").toString();
         String instructions = body.get("instructions") != null ? body.get("instructions").toString() : "";
         return ResponseEntity.ok(spaceService.adminAssignProfessional(id, professionalId, instructions, currentUser));
     }

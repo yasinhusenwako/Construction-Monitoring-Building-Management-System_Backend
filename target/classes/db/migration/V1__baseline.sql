@@ -1,0 +1,2 @@
+-- Baseline migration for existing schema.
+-- Add DDL in subsequent versions.

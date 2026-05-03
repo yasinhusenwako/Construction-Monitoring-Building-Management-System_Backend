@@ -25,10 +25,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -77,6 +79,11 @@ public class ProjectService {
         
         Project saved = projectRepository.save(project);
         requestLifecycleService.initialize(RequestType.PROJECT, saved.getId(), currentUser.getId());
+        
+        // Notify all admins (both database and Keycloak) about new project submission
+        requestLifecycleService.notifyUsersByRole(Role.ADMIN, "New Project Request", 
+            "Project " + saved.getProjectId() + " has been submitted by " + currentUser.getEmail());
+        
         return saved;
     }
 
@@ -195,7 +202,20 @@ public class ProjectService {
             return projectRepository.findAll();
         }
         if (currentUser.getRole() == Role.PROFESSIONAL) {
-            return projectRepository.findByAssignedProfessionalId(currentUser.getId());
+            // For Keycloak users, use email as ID
+            String professionalId = currentUser.getId();
+            System.out.println("=== PROFESSIONAL FETCHING PROJECTS ===");
+            System.out.println("Professional ID: " + professionalId);
+            System.out.println("Professional Email: " + currentUser.getEmail());
+            System.out.println("Professional Role: " + currentUser.getRole());
+            
+            List<Project> projects = projectRepository.findByAssignedProfessionalId(professionalId);
+            System.out.println("Found " + projects.size() + " projects assigned to professional");
+            for (Project p : projects) {
+                System.out.println("  - Project: " + p.getProjectId() + ", Assigned to: " + p.getAssignedProfessionalId());
+            }
+            
+            return projects;
         }
         if (currentUser.getDivisionId() == null) {
             throw new ApiException("Division not set for user");
@@ -207,43 +227,110 @@ public class ProjectService {
                                 String status,
                                 String priority,
                                 String projectId,
-                                Long divisionId,
-                                Long createdBy,
+                                String divisionId,
+                                String createdBy, // Changed to String
                                 LocalDate startDate,
                                 LocalDate endDate) {
+        // USER role: return only projects they created
+        if (currentUser.getRole() == Role.USER) {
+            String userId = currentUser.getId();
+            System.out.println("=== USER FETCHING PROJECTS ===");
+            System.out.println("User ID: " + userId);
+            System.out.println("User ID type: " + (userId != null ? userId.getClass().getName() : "null"));
+            System.out.println("User ID length: " + (userId != null ? userId.length() : 0));
+            
+            List<Project> userProjects = projectRepository.findByCreatedBy(userId);
+            System.out.println("Found " + userProjects.size() + " projects created by user");
+            
+            // Debug: Show all projects in database
+            List<Project> allProjects = projectRepository.findAll();
+            System.out.println("Total projects in database: " + allProjects.size());
+            if (!allProjects.isEmpty()) {
+                System.out.println("Sample project createdBy values:");
+                for (int i = 0; i < Math.min(5, allProjects.size()); i++) {
+                    Project p = allProjects.get(i);
+                    System.out.println("  - Project " + p.getProjectId() + ": createdBy='" + p.getCreatedBy() + "' (length=" + (p.getCreatedBy() != null ? p.getCreatedBy().length() : 0) + ")");
+                }
+            }
+            
+            return userProjects;
+        }
+        
         if (currentUser.getRole() == Role.PROFESSIONAL) {
             // For professionals, only return projects assigned to them
-            return projectRepository.findByAssignedProfessionalId(currentUser.getId());
+            String professionalId = currentUser.getId();
+            return projectRepository.findByAssignedProfessionalId(professionalId);
         }
-        Specification<Project> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (status != null && !status.isBlank()) {
-                predicates.add(cb.equal(root.get("status"), Status.fromValue(status)));
-            }
-            if (priority != null && !priority.isBlank()) {
-                predicates.add(cb.equal(root.get("priority"), priority));
-            }
-            if (projectId != null && !projectId.isBlank()) {
-                predicates.add(cb.equal(root.get("projectId"), projectId));
-            }
-            if (divisionId != null) {
-                predicates.add(cb.equal(root.get("divisionId"), divisionId));
-            }
-            if (createdBy != null) {
-                predicates.add(cb.equal(root.get("createdBy"), createdBy));
-            }
-            if (startDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("startDate"), startDate));
-            }
-            if (endDate != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("endDate"), endDate));
-            }
-            if (currentUser.getRole() == Role.SUPERVISOR) {
-                predicates.add(cb.equal(root.get("divisionId"), currentUser.getDivisionId()));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        return projectRepository.findAll(spec);
+        
+        if (currentUser.getRole() == Role.SUPERVISOR) {
+            // Supervisors see projects assigned to them OR in their division
+            String supervisorId = currentUser.getId();
+            System.out.println("=== SUPERVISOR FETCHING PROJECTS ===");
+            System.out.println("Supervisor ID: " + supervisorId);
+            System.out.println("Supervisor Division: " + currentUser.getDivisionId());
+            
+            List<Project> assignedToMe = projectRepository.findByAssignedSupervisorId(supervisorId);
+            List<Project> inMyDivision = projectRepository.findByDivisionId(currentUser.getDivisionId());
+            
+            // Combine and deduplicate
+            Set<Project> combined = new HashSet<>(assignedToMe);
+            combined.addAll(inMyDivision);
+            
+            System.out.println("Found " + assignedToMe.size() + " projects assigned to supervisor");
+            System.out.println("Found " + inMyDivision.size() + " projects in supervisor's division");
+            System.out.println("Total unique: " + combined.size());
+            
+            return new ArrayList<>(combined);
+        }
+        
+        // Admin filtering based on workflow stages
+        if (currentUser.getRole() == Role.ADMIN) {
+            Specification<Project> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                // Admin sees items in admin-owned workflow stages
+                // Projects don't have "Assigned to Supervisor" or "WorkOrder Created" stages
+                // IMPORTANT: Include IN_PROGRESS and COMPLETED so admin can see projects being worked on
+                List<Status> adminStages = List.of(
+                    Status.SUBMITTED,
+                    Status.UNDER_REVIEW,
+                    Status.ASSIGNED_TO_PROFESSIONALS,
+                    Status.IN_PROGRESS,
+                    Status.COMPLETED,
+                    Status.APPROVED,
+                    Status.REJECTED,
+                    Status.CLOSED
+                );
+                predicates.add(root.get("status").in(adminStages));
+                
+                if (status != null && !status.isBlank()) {
+                    predicates.add(cb.equal(root.get("status"), Status.fromValue(status)));
+                }
+                if (priority != null && !priority.isBlank()) {
+                    predicates.add(cb.equal(root.get("priority"), priority));
+                }
+                if (projectId != null && !projectId.isBlank()) {
+                    predicates.add(cb.equal(root.get("projectId"), projectId));
+                }
+                if (divisionId != null) {
+                    predicates.add(cb.equal(root.get("divisionId"), divisionId));
+                }
+                if (createdBy != null) {
+                    predicates.add(cb.equal(root.get("createdBy"), createdBy));
+                }
+                if (startDate != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("startDate"), startDate));
+                }
+                if (endDate != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("endDate"), endDate));
+                }
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            return projectRepository.findAll(spec);
+        }
+        
+        // Default: return empty list for unknown roles
+        return new ArrayList<>();
     }
 
     public FileRecord uploadDoc(Long projectId, MultipartFile file, Long userId, Role role) throws IOException {
@@ -320,21 +407,17 @@ public class ProjectService {
     }
 
     @Transactional
-    public Project adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+    public Project adminAssignProfessional(Long id, String professionalId, String instructions, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
-        User professional = userRepository.findById(professionalId).orElseThrow(() -> new ApiException("Professional not found"));
-        if (professional.getRole() != Role.PROFESSIONAL) {
-            throw new ApiException("Selected user is not a professional");
-        }
 
         System.out.println("=== ASSIGNING PROJECT TO PROFESSIONAL ===");
         System.out.println("Project ID: " + project.getId());
         System.out.println("Project Business ID: " + project.getProjectId());
-        System.out.println("Professional ID: " + professionalId);
-        System.out.println("Professional Name: " + professional.getName());
+        System.out.println("Professional ID (received): " + professionalId);
+        System.out.println("Professional ID type: " + professionalId.getClass().getName());
         System.out.println("Current Status: " + project.getStatus());
 
         // For projects, admin can directly assign professional from Under Review
@@ -354,18 +437,20 @@ public class ProjectService {
         }
         project.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
         
-        System.out.println("New Status: " + project.getStatus());
-        System.out.println("Assigned Professional ID: " + project.getAssignedProfessionalId());
+        Project saved = projectRepository.save(project);
         
-        requestLifecycleService.notifyUser(professionalId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        // Notify the professional about the assignment
+        requestLifecycleService.notifyUser(professionalId, "New Project Assignment", 
+            "Project " + project.getProjectId() + " has been assigned to you");
         
-        System.out.println("Notification sent to professional");
+        System.out.println("New Status: " + saved.getStatus());
+        System.out.println("Assigned Professional ID (stored): " + saved.getAssignedProfessionalId());
         System.out.println("=== ASSIGNMENT COMPLETE ===");
         
-        return projectRepository.save(project);
+        return saved;
     }
 
-    public Project adminAssign(Long id, Long divisionId, Long supervisorId, String priority, UserPrincipal admin) {
+    public Project adminAssign(Long id, String divisionId, String supervisorId, String priority, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
@@ -375,14 +460,24 @@ public class ProjectService {
         }
         DivisionRules.assertAllowed(divisionId);
 
-        User supervisor;
+        String finalSupervisorId;
         if (supervisorId != null) {
-            supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
-            if (supervisor.getRole() != Role.SUPERVISOR) {
-                throw new ApiException("Selected user is not a supervisor");
-            }
-            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
-                throw new ApiException("Supervisor must belong to selected division");
+            // SupervisorId can be either numeric (database user) or email (Keycloak user)
+            finalSupervisorId = supervisorId;
+            
+            // Try to validate if it's a database user
+            try {
+                Long numericId = Long.parseLong(supervisorId);
+                User supervisor = userRepository.findById(numericId).orElseThrow(() -> new ApiException("Supervisor not found"));
+                if (supervisor.getRole() != Role.SUPERVISOR) {
+                    throw new ApiException("Selected user is not a supervisor");
+                }
+                if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
+                    throw new ApiException("Supervisor must belong to selected division");
+                }
+            } catch (NumberFormatException e) {
+                // It's a Keycloak user (email) - we'll trust the frontend validation
+                System.out.println("Assigning to Keycloak supervisor: " + supervisorId);
             }
         } else {
             List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, divisionId);
@@ -392,18 +487,18 @@ public class ProjectService {
             if (supervisors.size() > 1) {
                 throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
             }
-            supervisor = supervisors.get(0);
+            finalSupervisorId = String.valueOf(supervisors.get(0).getId());
         }
 
         project.setDivisionId(divisionId);
-        project.setAssignedSupervisorId(supervisor.getId());
+        project.setAssignedSupervisorId(finalSupervisorId);
         if (priority != null && !priority.isBlank()) {
             project.setPriority(priority);
         }
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.UNDER_REVIEW, admin.getId());
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
         project.setStatus(Status.ASSIGNED_TO_SUPERVISOR);
-        requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "Project " + project.getProjectId() + " assigned to you");
+        requestLifecycleService.notifyUser(finalSupervisorId, "New assignment", "Project " + project.getProjectId() + " assigned to you");
         return projectRepository.save(project);
     }
     
@@ -470,6 +565,17 @@ public class ProjectService {
         
         requestLifecycleService.transition(RequestType.PROJECT, project.getId(), newStatus, professional.getId());
         project.setStatus(newStatus);
+        
+        // Notify admins (both database and Keycloak) and supervisor about status change
+        String notificationTitle = newStatus == Status.IN_PROGRESS ? "Project work started" : "Project completed";
+        String notificationMessage = "Project " + project.getProjectId() + " is now " + newStatus.getValue();
+        
+        requestLifecycleService.notifyUsersByRole(Role.ADMIN, notificationTitle, notificationMessage);
+        
+        if (project.getAssignedSupervisorId() != null) {
+            requestLifecycleService.notifyUser(project.getAssignedSupervisorId(), notificationTitle, notificationMessage);
+        }
+        
         return projectRepository.save(project);
     }
 

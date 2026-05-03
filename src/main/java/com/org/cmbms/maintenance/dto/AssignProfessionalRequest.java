@@ -14,7 +14,7 @@ public class AssignProfessionalRequest {
     private Long requestId;
     @NotNull
     @JsonAlias("professionalId")
-    private Long assignedProfessionalId;
+    private String assignedProfessionalId; // Changed to String to support both numeric IDs and email identifiers
     @NotBlank
     private String instructions;
 }

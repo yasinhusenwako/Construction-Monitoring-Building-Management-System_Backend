@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
-    List<Project> findByDivisionId(Long divisionId);
+    List<Project> findByDivisionId(String divisionId);
     Optional<Project> findByProjectId(String projectId);
-    List<Project> findByAssignedProfessionalId(Long assignedProfessionalId);
+    List<Project> findByAssignedProfessionalId(String assignedProfessionalId); // Changed to String
+    List<Project> findByAssignedSupervisorId(String assignedSupervisorId); // Changed to String
+    List<Project> findByCreatedBy(String createdBy); // For USER role to find their own projects
 }

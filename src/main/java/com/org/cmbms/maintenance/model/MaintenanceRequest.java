@@ -31,15 +31,17 @@ public class MaintenanceRequest {
     @Column(name = "rejectionReason", columnDefinition = "TEXT")
     private String rejectionReason;
     @Column(name = "createdBy")
-    private Long createdBy;
+    private String createdBy; // Changed to String to support both numeric IDs and email identifiers
     @Column(name = "createdAt")
     private LocalDateTime createdAt;
     @Column(name = "divisionId")
-    private Long divisionId;
-    @Column(name = "assignedSupervisorId")
-    private Long assignedSupervisorId;
+    private String divisionId; // Changed to String to support "DIV-001" format
+    
+    @Column(name = "assignedSupervisorId", length = 255)
+    private String assignedSupervisorId; // Changed to String to support both numeric IDs and email identifiers
+    
     @Column(name = "assignedProfessionalId")
-    private Long assignedProfessionalId;
+    private String assignedProfessionalId; // Changed to String to support both numeric IDs and email identifiers
     @Column(name = "materialCost")
     private Double materialCost;
     @Column(name = "laborCost")

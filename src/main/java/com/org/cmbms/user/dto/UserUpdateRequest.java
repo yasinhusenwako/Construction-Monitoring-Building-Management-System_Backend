@@ -17,7 +17,7 @@ public class UserUpdateRequest {
     private String email;
 
     private Role role;
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
     private String phone;
     private String department;
     private String profession;

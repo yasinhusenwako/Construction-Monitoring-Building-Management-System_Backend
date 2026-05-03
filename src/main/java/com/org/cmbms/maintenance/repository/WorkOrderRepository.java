@@ -8,6 +8,6 @@ import java.util.Optional;
 
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     Optional<WorkOrder> findByMaintenanceRequestId(Long maintenanceRequestId);
-    List<WorkOrder> findByAssignedProfessionalId(Long assignedProfessionalId);
+    List<WorkOrder> findByAssignedProfessionalId(String assignedProfessionalId); // Changed to String
 }
 

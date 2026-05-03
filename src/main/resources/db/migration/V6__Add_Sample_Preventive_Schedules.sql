@@ -21,4 +21,5 @@ VALUES
 ('PM-007', 'Water Pumps – Main Building', 'Every 6 months', CURRENT_DATE - INTERVAL '4 months', CURRENT_DATE + INTERVAL '2 months', 'Scheduled', 'Tekle Haile', 5, 'Check motor, seals, and pressure', CURRENT_DATE - INTERVAL '4 months', CURRENT_DATE),
 ('PM-008', 'Emergency Lighting System', 'Every year', CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE + INTERVAL '9 months', 'Scheduled', 'Dawit Tadesse', 6, 'Test all emergency lights and exit signs', CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE),
 ('PM-009', 'Plumbing System Inspection', 'Every 6 months', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE + INTERVAL '5 months', 'Scheduled', 'Tekle Haile', 5, 'Check for leaks, pressure, and drainage', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE),
-('PM-010', 'Security System – CCTV', 'Every 3 months', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE + INTERVAL '2 months', 'Scheduled', 'Dawit Tadesse', 6, 'Clean cameras, check recording, test motion sensors', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE);
+('PM-010', 'Security System – CCTV', 'Every 3 months', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE + INTERVAL '2 months', 'Scheduled', 'Dawit Tadesse', 6, 'Clean cameras, check recording, test motion sensors', CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE)
+ON CONFLICT (schedule_id) DO NOTHING;

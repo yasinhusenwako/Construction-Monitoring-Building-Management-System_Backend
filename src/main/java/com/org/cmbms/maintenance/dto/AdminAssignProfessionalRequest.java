@@ -13,6 +13,6 @@ public class AdminAssignProfessionalRequest {
     @NotNull
     private RequestType requestType;
     @NotNull
-    private Long assignedProfessionalId;
+    private String assignedProfessionalId; // Changed to String to support both numeric IDs and email identifiers
     private String instructions;
 }

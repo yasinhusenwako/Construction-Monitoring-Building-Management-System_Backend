@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,9 @@ public class WorkflowService {
 
     public List<MaintenanceRequest> getProfessionalTasks(UserPrincipal professional) {
         ensureRole(professional, Role.PROFESSIONAL);
-        return maintenanceRepository.findByAssignedProfessionalId(professional.getId());
+        // Use email as ID for Keycloak users
+        String professionalId = professional.getId();
+        return maintenanceRepository.findByAssignedProfessionalId(professionalId);
     }
 
     public List<MaintenanceRequest> getAllRequests(UserPrincipal admin) {
@@ -85,33 +88,60 @@ public class WorkflowService {
             maintenance.setPriority(request.getPriority());
         }
 
-        User supervisor;
+        String supervisorId;
         if (request.getSupervisorId() != null) {
-            supervisor = userRepository.findById(request.getSupervisorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Supervisor not found"));
-            if (supervisor.getRole() != Role.SUPERVISOR) {
-                throw new ApiException("Selected user is not a supervisor");
-            }
-            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(request.getDivisionId())) {
-                throw new ApiException("Supervisor must belong to selected division");
+            // SupervisorId can be either numeric (database user) or email (Keycloak user)
+            supervisorId = request.getSupervisorId();
+            
+            // Try to validate if it's a database user
+            try {
+                Long numericId = Long.parseLong(supervisorId);
+                User supervisor = userRepository.findById(numericId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Supervisor not found"));
+                if (supervisor.getRole() != Role.SUPERVISOR) {
+                    throw new ApiException("Selected user is not a supervisor");
+                }
+                if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(request.getDivisionId())) {
+                    throw new ApiException("Supervisor must belong to selected division");
+                }
+            } catch (NumberFormatException e) {
+                // It's a Keycloak user (email) - we'll trust the frontend validation
+                System.out.println("Assigning to Keycloak supervisor: " + supervisorId);
             }
         } else {
+            // Auto-assign: try to find a supervisor for this division
             List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, request.getDivisionId());
             if (supervisors.isEmpty()) {
-                throw new ApiException("No supervisor account found for selected division");
-            }
-            if (supervisors.size() > 1) {
+                // No database supervisor found - allow assignment without supervisor
+                // The division will be set, but no specific supervisor assigned
+                // This allows Keycloak supervisors in that division to see the request
+                System.out.println("No database supervisor found for division " + request.getDivisionId() + ". Assigning to division only.");
+                supervisorId = null;
+            } else if (supervisors.size() > 1) {
                 throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
+            } else {
+                supervisorId = String.valueOf(supervisors.get(0).getId());
             }
-            supervisor = supervisors.get(0);
         }
-        maintenance.setAssignedSupervisorId(supervisor.getId());
-        // Only transition to UNDER_REVIEW if currently SUBMITTED
+        
+        if (supervisorId != null) {
+            maintenance.setAssignedSupervisorId(supervisorId);
+            requestLifecycleService.notifyUser(supervisorId, "New assignment", "You have been assigned maintenance " + maintenance.getMaintenanceId());
+        }
+        
+        // Only transition if not already in ASSIGNED_TO_SUPERVISOR status
+        Long adminNumericId = admin.getNumericId() != null ? admin.getNumericId() : 0L;
+        
+        // If currently SUBMITTED, move to UNDER_REVIEW first
         if (maintenance.getStatus() == Status.SUBMITTED) {
-            transition(maintenance, Status.UNDER_REVIEW, admin.getId());
+            transition(maintenance, Status.UNDER_REVIEW, adminNumericId);
         }
-        transition(maintenance, Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
-        requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "You have been assigned maintenance " + maintenance.getMaintenanceId());
+        
+        // Only transition to ASSIGNED_TO_SUPERVISOR if not already there
+        if (maintenance.getStatus() != Status.ASSIGNED_TO_SUPERVISOR) {
+            transition(maintenance, Status.ASSIGNED_TO_SUPERVISOR, adminNumericId);
+        }
+        
         return maintenanceRepository.save(maintenance);
     }
 
@@ -127,30 +157,26 @@ public class WorkflowService {
             throw new ApiException("supervisor sees only division requests");
         }
         
-        User professional = userRepository.findById(request.getAssignedProfessionalId())
-                .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
-        if (professional.getRole() != Role.PROFESSIONAL) {
-            throw new ApiException("Selected user is not a professional");
-        }
-        if (professional.getDivisionId() == null) {
-            // First assignment binds the professional to supervisor's division for consistent routing.
-            professional.setDivisionId(supervisor.getDivisionId());
-            userRepository.save(professional);
-        } else if (!professional.getDivisionId().equals(supervisor.getDivisionId())) {
-            throw new ApiException("Professional must belong to the same division as the supervisor and request.");
-        }
-
-        maintenance.setAssignedProfessionalId(professional.getId());
-        transition(maintenance, Status.ASSIGNED_TO_PROFESSIONALS, supervisor.getId());
+        // For Keycloak users, request.getAssignedProfessionalId() will be an email string
+        // For database users, it will be a numeric ID
+        // We store it directly without validation since Keycloak users aren't in the database
+        String professionalId = String.valueOf(request.getAssignedProfessionalId());
+        
+        maintenance.setAssignedProfessionalId(professionalId);
+        Long supervisorNumericId = supervisor.getNumericId() != null ? supervisor.getNumericId() : 0L;
+        transition(maintenance, Status.ASSIGNED_TO_PROFESSIONALS, supervisorNumericId);
 
         WorkOrder workOrder = workOrderRepository.findByMaintenanceRequestId(maintenance.getId()).orElse(new WorkOrder());
         workOrder.setMaintenanceRequestId(maintenance.getId());
-        workOrder.setAssignedProfessionalId(professional.getId());
+        workOrder.setAssignedProfessionalId(professionalId);
         workOrder.setInstructions(request.getInstructions());
         workOrder.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
         workOrderRepository.save(workOrder);
 
-        requestLifecycleService.notifyUser(professional.getId(), "New task", "Maintenance " + maintenance.getMaintenanceId() + " assigned to you");
+        // Notify the professional about the assignment
+        requestLifecycleService.notifyUser(professionalId, "New Maintenance Assignment", 
+            "Maintenance " + maintenance.getMaintenanceId() + " has been assigned to you by supervisor");
+        
         return maintenanceRepository.save(maintenance);
     }
 
@@ -158,13 +184,40 @@ public class WorkflowService {
     public MaintenanceRequest updateTaskStatus(UserPrincipal professional, Long id, TaskStatusUpdateRequest request) {
         ensureRole(professional, Role.PROFESSIONAL);
         MaintenanceRequest maintenance = getMaintenance(id);
-        if (!professional.getId().equals(maintenance.getAssignedProfessionalId())) {
+        
+        // Check if professional is assigned to this task
+        // For database users: compare numeric ID
+        // For Keycloak users: compare email
+        boolean isAssigned = false;
+        if (maintenance.getAssignedProfessionalId() != null) {
+            Long professionalNumericId = professional.getNumericId();
+            if (professionalNumericId != null) {
+                // Database user - compare numeric ID
+                isAssigned = maintenance.getAssignedProfessionalId().equals(String.valueOf(professionalNumericId));
+            } else {
+                // Keycloak user - compare email
+                isAssigned = maintenance.getAssignedProfessionalId().equals(professional.getEmail());
+            }
+        }
+        
+        if (!isAssigned) {
             throw new ApiException("professional sees only assigned tasks");
         }
+        
         if (request.getStatus() != Status.IN_PROGRESS && request.getStatus() != Status.COMPLETED) {
             throw new ApiException("Professional can only update to IN_PROGRESS or COMPLETED");
         }
-        transition(maintenance, request.getStatus(), professional.getId());
+        
+        Long professionalNumericId = professional.getNumericId() != null ? professional.getNumericId() : 0L;
+        transition(maintenance, request.getStatus(), professionalNumericId);
+        
+        // Notify supervisor about status change
+        if (request.getStatus() == Status.IN_PROGRESS && maintenance.getAssignedSupervisorId() != null) {
+            requestLifecycleService.notifyUser(maintenance.getAssignedSupervisorId(), 
+                "Maintenance work started", 
+                "Maintenance " + maintenance.getMaintenanceId() + " work has started");
+        }
+        
         return maintenanceRepository.save(maintenance);
     }
 
@@ -172,7 +225,8 @@ public class WorkflowService {
     public MaintenanceRequest adminApprove(UserPrincipal admin, Long requestId) {
         ensureRole(admin, Role.ADMIN);
         MaintenanceRequest maintenance = getMaintenance(requestId);
-        transition(maintenance, Status.APPROVED, admin.getId());
+        Long adminNumericId = admin.getNumericId() != null ? admin.getNumericId() : 0L;
+        transition(maintenance, Status.APPROVED, adminNumericId);
         return maintenanceRepository.save(maintenance);
     }
 
@@ -180,7 +234,8 @@ public class WorkflowService {
     public MaintenanceRequest adminReject(UserPrincipal admin, Long requestId) {
         ensureRole(admin, Role.ADMIN);
         MaintenanceRequest maintenance = getMaintenance(requestId);
-        transition(maintenance, Status.REJECTED, admin.getId());
+        Long adminNumericId = admin.getNumericId() != null ? admin.getNumericId() : 0L;
+        transition(maintenance, Status.REJECTED, adminNumericId);
         return maintenanceRepository.save(maintenance);
     }
 
@@ -189,7 +244,8 @@ public class WorkflowService {
         ensureRole(admin, Role.ADMIN);
         MaintenanceRequest maintenance = getMaintenance(requestId);
         // Move to UNDER_REVIEW to start the admin review process
-        transition(maintenance, Status.UNDER_REVIEW, admin.getId());
+        Long adminNumericId = admin.getNumericId() != null ? admin.getNumericId() : 0L;
+        transition(maintenance, Status.UNDER_REVIEW, adminNumericId);
         return maintenanceRepository.save(maintenance);
     }
 
@@ -197,7 +253,8 @@ public class WorkflowService {
     public MaintenanceRequest adminClose(UserPrincipal admin, Long requestId) {
         ensureRole(admin, Role.ADMIN);
         MaintenanceRequest maintenance = getMaintenance(requestId);
-        transition(maintenance, Status.CLOSED, admin.getId());
+        Long adminNumericId = admin.getNumericId() != null ? admin.getNumericId() : 0L;
+        transition(maintenance, Status.CLOSED, adminNumericId);
         return maintenanceRepository.save(maintenance);
     }
 
@@ -215,47 +272,23 @@ public class WorkflowService {
             throw new ApiException("supervisor sees only division requests");
         }
         
-        transition(maintenance, Status.REVIEWED, supervisor.getId());
+        Long supervisorNumericId = supervisor.getNumericId() != null ? supervisor.getNumericId() : 0L;
+        transition(maintenance, Status.REVIEWED, supervisorNumericId);
         return maintenanceRepository.save(maintenance);
     }
 
     public void transition(MaintenanceRequest request, Status next, Long changedBy) {
-        Status current = request.getStatus();
-        if (current == null) {
-            if (next != Status.SUBMITTED) {
-                throw new ApiException("First status must be SUBMITTED");
-            }
-        } else {
-            EnumSet<Status> allowed = TRANSITIONS.get(current);
-            if (allowed == null || !allowed.contains(next)) {
-                // Allow admins to force transition if needed (relax for admin assignment)
-                if (next == Status.ASSIGNED_TO_PROFESSIONALS || next == Status.ASSIGNED_TO_SUPERVISOR) {
-                    // Log a warning or handle as needed, but allow transition
-                } else {
-                    throw new ApiException("Invalid transition: " + current + " -> " + next);
-                }
-            }
-        }
+        // Use RequestLifecycleService for consistent validation and history logging
+        requestLifecycleService.transition(RequestType.MAINTENANCE, request.getId(), next, changedBy);
         request.setStatus(next);
-        StatusHistory history = new StatusHistory();
-        history.setRequestId(request.getId());
-        history.setRequestType(RequestType.MAINTENANCE);
-        history.setStatus(next);
-        history.setChangedBy(changedBy);
-        history.setTimestamp(LocalDateTime.now());
-        statusHistoryRepository.save(history);
         if (next == Status.COMPLETED && request.getAssignedSupervisorId() != null) {
             requestLifecycleService.notifyUser(request.getAssignedSupervisorId(), "Task completed", "Maintenance " + request.getMaintenanceId() + " completed");
-            List<User> admins = userRepository.findByRole(Role.ADMIN);
-            for (User admin : admins) {
-                requestLifecycleService.notifyUser(admin.getId(), "Task completed", "Maintenance " + request.getMaintenanceId() + " completed and ready for review");
-            }
+            // Notify all admins (both database and Keycloak)
+            requestLifecycleService.notifyUsersByRole(Role.ADMIN, "Task completed", "Maintenance " + request.getMaintenanceId() + " completed and ready for review");
         }
         if (next == Status.REVIEWED) {
-            List<User> admins = userRepository.findByRole(Role.ADMIN);
-            for (User admin : admins) {
-                requestLifecycleService.notifyUser(admin.getId(), "Supervisor reviewed", "Maintenance " + request.getMaintenanceId() + " reviewed");
-            }
+            // Notify all admins (both database and Keycloak)
+            requestLifecycleService.notifyUsersByRole(Role.ADMIN, "Supervisor reviewed", "Maintenance " + request.getMaintenanceId() + " reviewed");
         }
         if (next == Status.APPROVED || next == Status.REJECTED) {
             requestLifecycleService.notifyUser(request.getCreatedBy(), "Admin decision", "Maintenance " + request.getMaintenanceId() + " is " + next.getValue());
@@ -278,10 +311,20 @@ public class WorkflowService {
         ensureRole(user, Role.PROFESSIONAL);
         MaintenanceRequest maintenance = getMaintenance(id);
         
+        System.out.println("=== UPDATE TASK COST ===");
+        System.out.println("Maintenance ID: " + id);
+        System.out.println("Assigned Professional ID (DB): " + maintenance.getAssignedProfessionalId());
+        System.out.println("Current User ID: " + user.getId());
+        System.out.println("Current User Email: " + user.getEmail());
+        
         // Verify the professional is assigned to this task
-        if (maintenance.getAssignedProfessionalId() == null || !maintenance.getAssignedProfessionalId().equals(user.getId())) {
+        // Compare using user ID (email for Keycloak users, numeric string for legacy users)
+        String userId = user.getId();
+        if (maintenance.getAssignedProfessionalId() == null || userId == null || !maintenance.getAssignedProfessionalId().equals(userId)) {
             throw new ApiException("You are not assigned to this task");
         }
+        
+        System.out.println("Assignment verified! Updating cost...");
         
         // Update cost information
         maintenance.setMaterialCost(request.getMaterialCost());
@@ -293,7 +336,11 @@ public class WorkflowService {
         double laborCost = request.getLaborCost() != null ? request.getLaborCost() : 0.0;
         maintenance.setTotalCost(materialCost + laborCost);
         
-        return maintenanceRepository.save(maintenance);
+        MaintenanceRequest saved = maintenanceRepository.save(maintenance);
+        System.out.println("Cost updated successfully!");
+        System.out.println("=== UPDATE COMPLETE ===");
+        
+        return saved;
     }
 
     private MaintenanceRequest getMaintenance(Long id) {

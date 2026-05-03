@@ -45,7 +45,12 @@ public class ProfessionalController {
     public ResponseEntity<Map<String, Object>> uploadProof(@RequestParam @NotNull Long maintenanceRequestId,
                                                            @RequestParam("file") MultipartFile file) throws IOException {
         UserPrincipal user = SecurityUtils.getCurrentUser();
-        FileRecord record = fileStorageService.save(maintenanceRequestId, "MAINTENANCE_PROOF", file, user.getId());
+        // Convert userId to Long for file storage
+        Long numericUserId = user.getNumericId();
+        if (numericUserId == null) {
+            numericUserId = 0L; // Keycloak user placeholder
+        }
+        FileRecord record = fileStorageService.save(maintenanceRequestId, "MAINTENANCE_PROOF", file, numericUserId);
         return ResponseEntity.ok(Map.of(
                 "id", record.getId(),
                 "fileName", record.getFileName(),

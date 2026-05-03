@@ -22,8 +22,9 @@ import org.springframework.data.jpa.domain.Specification;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-
+import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class SpaceService {
@@ -45,9 +46,9 @@ public class SpaceService {
             }
         }
         if ("OFFICE".equalsIgnoreCase(dto.getType())) {
-            int availableInventory = 25;
-            if (dto.getCapacity() != null && dto.getCapacity() > 25) {
-                throw new ApiException("Office inventory insufficient for requested capacity");
+            int availableInventory = 100; // Increased from 25 to 100
+            if (dto.getCapacity() != null && dto.getCapacity() > 100) {
+                throw new ApiException("Office inventory insufficient for requested capacity (max: 100)");
             }
             if (dto.getCapacity() != null && dto.getCapacity() > availableInventory) {
                 throw new ApiException("Office inventory insufficient for requested capacity");
@@ -57,13 +58,14 @@ public class SpaceService {
         booking.setBookingId(dto.getBookingId());
         booking.setType(dto.getType());
         booking.setStatus(Status.SUBMITTED);
-        booking.setRequester(dto.getRequester());
+        // Use current user's email from Keycloak instead of DTO requester
+        booking.setRequester(currentUser.getEmail());
         booking.setDateTime(dto.getDateTime());
         booking.setEndTime(dto.getEndTime());
         booking.setCapacity(dto.getCapacity());
         booking.setLayout(dto.getLayout());
         booking.setAmenities(dto.getAmenities());
-        Long selectedDivisionId;
+        String selectedDivisionId;
         if (currentUser.getRole() == Role.SUPERVISOR && currentUser.getDivisionId() != null) {
             selectedDivisionId = currentUser.getDivisionId();
         } else {
@@ -75,6 +77,11 @@ public class SpaceService {
         booking.setDivisionId(selectedDivisionId);
         Booking saved = spaceRepository.save(booking);
         requestLifecycleService.initialize(RequestType.BOOKING, saved.getId(), currentUser.getId());
+        
+        // Notify all admins (both database and Keycloak) about new booking submission
+        requestLifecycleService.notifyUsersByRole(Role.ADMIN, "New Booking Request", 
+            "Booking " + saved.getBookingId() + " has been submitted by " + currentUser.getEmail());
+        
         return saved;
     }
 
@@ -142,9 +149,30 @@ public class SpaceService {
                                 String status,
                                 String type,
                                 String bookingId,
-                                Long divisionId,
+                                String divisionId,
                                 Long requester,
                                 LocalDate date) {
+        // Supervisors see bookings assigned to them OR in their division
+        if (currentUser.getRole() == Role.SUPERVISOR) {
+            String supervisorId = currentUser.getId();
+            System.out.println("=== SUPERVISOR FETCHING BOOKINGS ===");
+            System.out.println("Supervisor ID: " + supervisorId);
+            System.out.println("Supervisor Division: " + currentUser.getDivisionId());
+            
+            List<Booking> assignedToMe = spaceRepository.findByAssignedSupervisorId(supervisorId);
+            List<Booking> inMyDivision = spaceRepository.findByDivisionId(currentUser.getDivisionId());
+            
+            // Combine and deduplicate
+            Set<Booking> combined = new HashSet<>(assignedToMe);
+            combined.addAll(inMyDivision);
+            
+            System.out.println("Found " + assignedToMe.size() + " bookings assigned to supervisor");
+            System.out.println("Found " + inMyDivision.size() + " bookings in supervisor's division");
+            System.out.println("Total unique: " + combined.size());
+            
+            return new ArrayList<>(combined);
+        }
+        
         Specification<Booking> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             
@@ -153,7 +181,23 @@ public class SpaceService {
                 Predicate isAssigned = cb.equal(root.get("assignedProfessionalId"), currentUser.getId());
                 Predicate isRequester = cb.equal(root.get("requester"), currentUser.getId());
                 predicates.add(cb.or(isAssigned, isRequester));
+            } else if (currentUser.getRole() == Role.ADMIN) {
+                // Admin sees items in admin-owned workflow stages
+                // Bookings don't have "Assigned to Supervisor" or "WorkOrder Created" stages
+                // IMPORTANT: Include IN_PROGRESS and COMPLETED so admin can see bookings being worked on
+                List<Status> adminStages = List.of(
+                    Status.SUBMITTED,
+                    Status.UNDER_REVIEW,
+                    Status.ASSIGNED_TO_PROFESSIONALS,
+                    Status.IN_PROGRESS,
+                    Status.COMPLETED,
+                    Status.APPROVED,
+                    Status.REJECTED,
+                    Status.CLOSED
+                );
+                predicates.add(root.get("status").in(adminStages));
             }
+            
             if (status != null && !status.isBlank()) {
                 predicates.add(cb.equal(root.get("status"), Status.fromValue(status)));
             }
@@ -173,9 +217,6 @@ public class SpaceService {
                 LocalDateTime start = date.atStartOfDay();
                 LocalDateTime end = date.plusDays(1).atStartOfDay().minusNanos(1);
                 predicates.add(cb.between(root.get("dateTime"), start, end));
-            }
-            if (currentUser.getRole() == Role.SUPERVISOR && currentUser.getDivisionId() != null) {
-                predicates.add(cb.equal(root.get("divisionId"), currentUser.getDivisionId()));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -249,21 +290,16 @@ public class SpaceService {
 
     
     @Transactional
-    public Booking adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+    public Booking adminAssignProfessional(Long id, String professionalId, String instructions, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
         Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
-        User professional = userRepository.findById(professionalId).orElseThrow(() -> new ApiException("Professional not found"));
-        if (professional.getRole() != Role.PROFESSIONAL) {
-            throw new ApiException("Selected user is not a professional");
-        }
 
         System.out.println("=== ASSIGNING BOOKING TO PROFESSIONAL ===");
         System.out.println("Booking ID: " + booking.getId());
         System.out.println("Booking Business ID: " + booking.getBookingId());
         System.out.println("Professional ID: " + professionalId);
-        System.out.println("Professional Name: " + professional.getName());
         System.out.println("Current Status: " + booking.getStatus());
 
         // For bookings, admin can directly assign professional from Under Review
@@ -283,18 +319,21 @@ public class SpaceService {
         }
         booking.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
         
-        System.out.println("New Status: " + booking.getStatus());
-        System.out.println("Assigned Professional ID: " + booking.getAssignedProfessionalId());
+        Booking saved = spaceRepository.save(booking);
         
-        requestLifecycleService.notifyUser(professionalId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        // Notify the professional about the assignment
+        requestLifecycleService.notifyUser(professionalId, "New Booking Assignment", 
+            "Booking " + booking.getBookingId() + " has been assigned to you");
         
+        System.out.println("New Status: " + saved.getStatus());
+        System.out.println("Assigned Professional ID: " + saved.getAssignedProfessionalId());
         System.out.println("Notification sent to professional");
         System.out.println("=== ASSIGNMENT COMPLETE ===");
         
-        return spaceRepository.save(booking);
+        return saved;
     }
 
-    public Booking adminAssign(Long id, Long divisionId, Long supervisorId, UserPrincipal admin) {
+    public Booking adminAssign(Long id, String divisionId, String supervisorId, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
@@ -304,14 +343,24 @@ public class SpaceService {
         }
         DivisionRules.assertAllowed(divisionId);
 
-        User supervisor;
+        String finalSupervisorId;
         if (supervisorId != null) {
-            supervisor = userRepository.findById(supervisorId).orElseThrow(() -> new ApiException("Supervisor not found"));
-            if (supervisor.getRole() != Role.SUPERVISOR) {
-                throw new ApiException("Selected user is not a supervisor");
-            }
-            if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
-                throw new ApiException("Supervisor must belong to selected division");
+            // SupervisorId can be either numeric (database user) or email (Keycloak user)
+            finalSupervisorId = supervisorId;
+            
+            // Try to validate if it's a database user
+            try {
+                Long numericId = Long.parseLong(supervisorId);
+                User supervisor = userRepository.findById(numericId).orElseThrow(() -> new ApiException("Supervisor not found"));
+                if (supervisor.getRole() != Role.SUPERVISOR) {
+                    throw new ApiException("Selected user is not a supervisor");
+                }
+                if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(divisionId)) {
+                    throw new ApiException("Supervisor must belong to selected division");
+                }
+            } catch (NumberFormatException e) {
+                // It's a Keycloak user (email) - we'll trust the frontend validation
+                System.out.println("Assigning to Keycloak supervisor: " + supervisorId);
             }
         } else {
             List<User> supervisors = userRepository.findByRoleAndDivisionId(Role.SUPERVISOR, divisionId);
@@ -321,15 +370,15 @@ public class SpaceService {
             if (supervisors.size() > 1) {
                 throw new ApiException("Multiple supervisor accounts found for selected division. Keep only one account per division.");
             }
-            supervisor = supervisors.get(0);
+            finalSupervisorId = String.valueOf(supervisors.get(0).getId());
         }
 
         booking.setDivisionId(divisionId);
-        booking.setAssignedSupervisorId(supervisor.getId());
+        booking.setAssignedSupervisorId(finalSupervisorId);
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.UNDER_REVIEW, admin.getId());
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), Status.ASSIGNED_TO_SUPERVISOR, admin.getId());
         booking.setStatus(Status.ASSIGNED_TO_SUPERVISOR);
-        requestLifecycleService.notifyUser(supervisor.getId(), "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
+        requestLifecycleService.notifyUser(finalSupervisorId, "New assignment", "Booking " + booking.getBookingId() + " assigned to you");
         return spaceRepository.save(booking);
     }
     
@@ -376,6 +425,18 @@ public class SpaceService {
         
         requestLifecycleService.transition(RequestType.BOOKING, booking.getId(), newStatus, professional.getId());
         booking.setStatus(newStatus);
+        
+        // Notify admins and supervisor about status change
+        // Notify admins (both database and Keycloak) and supervisor about status change
+        String notificationTitle = newStatus == Status.IN_PROGRESS ? "Booking work started" : "Booking completed";
+        String notificationMessage = "Booking " + booking.getBookingId() + " is now " + newStatus.getValue();
+        
+        requestLifecycleService.notifyUsersByRole(Role.ADMIN, notificationTitle, notificationMessage);
+        
+        if (booking.getAssignedSupervisorId() != null) {
+            requestLifecycleService.notifyUser(booking.getAssignedSupervisorId(), notificationTitle, notificationMessage);
+        }
+        
         return spaceRepository.save(booking);
     }
     
