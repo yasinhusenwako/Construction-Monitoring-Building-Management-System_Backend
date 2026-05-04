@@ -26,9 +26,11 @@ public class Booking {
     @Column(name = "rejectionReason", columnDefinition = "TEXT")
     private String rejectionReason;
     @Column(name = "requester")
-    private Long requester;
+    private String requester; // Changed to String to support both numeric IDs and email identifiers
     @Column(name = "dateTime")
     private LocalDateTime dateTime;
+    @Column(name = "endTime")
+    private LocalDateTime endTime;
     @Column(name = "capacity")
     private Integer capacity;
     @Column(name = "layout")
@@ -36,12 +38,13 @@ public class Booking {
     @Column(name = "amenities", columnDefinition = "TEXT")
     private String amenities;
     @Column(name = "divisionId")
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
 
-    @Column(name = "assignedSupervisorId")
-    private Long assignedSupervisorId;
+    @Column(name = "assignedSupervisorId", length = 255)
+    private String assignedSupervisorId; // Changed to String to support both numeric IDs and email identifiers
+    
     @Column(name = "assignedProfessionalId")
-    private Long assignedProfessionalId;
+    private String assignedProfessionalId; // Changed to String to support both numeric IDs and email identifiers
     
     @Column(name = "materialCost")
     private java.math.BigDecimal materialCost;

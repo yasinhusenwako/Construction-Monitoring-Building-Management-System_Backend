@@ -61,7 +61,18 @@ public class FileController {
             }
 
             List<Map<String, Object>> uploadedFiles = new ArrayList<>();
-            Long userId = userPrincipal != null ? userPrincipal.getId() : null;
+            String userId = userPrincipal != null ? userPrincipal.getId() : null;
+            
+            // Convert userId to Long for file storage (only works for numeric IDs)
+            Long numericUserId = null;
+            if (userId != null) {
+                try {
+                    numericUserId = Long.parseLong(userId);
+                } catch (NumberFormatException e) {
+                    // Keycloak user - use 0 as placeholder
+                    numericUserId = 0L;
+                }
+            }
 
             for (MultipartFile file : files) {
                 // Validate file
@@ -72,7 +83,7 @@ public class FileController {
                         numericId,
                         normalizedType.toUpperCase(),
                         file,
-                        userId
+                        numericUserId
                 );
 
                 // Build response for this file

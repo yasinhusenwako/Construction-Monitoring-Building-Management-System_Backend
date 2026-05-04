@@ -14,11 +14,18 @@ public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long userId;
+    
+    @Column(name = "user_id", length = 255)
+    private String userId;  // Changed from Long to String to support both numeric IDs and emails
+    
     private String title;
+    
     @Column(columnDefinition = "TEXT")
     private String message;
+    
     private Boolean isRead;
+    
     private LocalDateTime createdAt;
 }
+
 

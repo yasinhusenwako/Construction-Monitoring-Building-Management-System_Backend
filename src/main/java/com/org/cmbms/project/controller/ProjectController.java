@@ -44,8 +44,8 @@ public class ProjectController {
     public ResponseEntity<List<Project>> all(@RequestParam(required = false) String status,
                                              @RequestParam(required = false) String priority,
                                              @RequestParam(required = false) String projectId,
-                                             @RequestParam(required = false) Long divisionId,
-                                             @RequestParam(required = false) Long createdBy,
+                                             @RequestParam(required = false) String divisionId,
+                                             @RequestParam(required = false) String createdBy, // Changed to String
                                              @RequestParam(required = false) LocalDate startDate,
                                              @RequestParam(required = false) LocalDate endDate) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
@@ -56,7 +56,12 @@ public class ProjectController {
     public ResponseEntity<ProjectDocUploadResponse> uploadDoc(@PathVariable("id") Long id,
                                                               @RequestParam("file") MultipartFile file) throws IOException {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        FileRecord record = projectService.uploadDoc(id, file, currentUser.getId(), currentUser.getRole());
+        // Convert userId to Long for file storage
+        Long numericUserId = currentUser.getNumericId();
+        if (numericUserId == null) {
+            numericUserId = 0L; // Keycloak user placeholder
+        }
+        FileRecord record = projectService.uploadDoc(id, file, numericUserId, currentUser.getRole());
         return ResponseEntity.ok(new ProjectDocUploadResponse(record.getId(), record.getFileName(), record.getFilePath()));
     }
 
@@ -111,7 +116,7 @@ public class ProjectController {
     @PostMapping("/{id}/assign-professional")
     public ResponseEntity<Project> assignProfessional(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
         UserPrincipal currentUser = SecurityUtils.getCurrentUser();
-        Long professionalId = Long.valueOf(body.get("professionalId").toString());
+        String professionalId = body.get("professionalId").toString();
         String instructions = body.get("instructions") != null ? body.get("instructions").toString() : "";
         return ResponseEntity.ok(projectService.adminAssignProfessional(id, professionalId, instructions, currentUser));
     }

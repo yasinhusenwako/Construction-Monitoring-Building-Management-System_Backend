@@ -12,8 +12,8 @@ public class AdminAssignRequest {
     @NotNull
     private String requestType;
     @NotNull
-    private Long divisionId;
-    private Long supervisorId;
+    private String divisionId; // Changed to String to support "DIV-001" format
+    private String supervisorId; // Changed to String to support both numeric IDs and email identifiers
     private String priority;
 }
 

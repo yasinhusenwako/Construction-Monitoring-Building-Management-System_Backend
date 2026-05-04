@@ -57,20 +57,22 @@ public class AdminController {
     public ResponseEntity<?> assignProfessional(@Valid @RequestBody AdminAssignProfessionalRequest request) {
         UserPrincipal user = SecurityUtils.getCurrentUser();
         RequestType type = request.getRequestType();
+        String professionalId = request.getAssignedProfessionalId();
+        
         if (RequestType.MAINTENANCE == type) {
             MaintenanceRequest out = workflowService.assignProfessional(user, new com.org.cmbms.maintenance.dto.AssignProfessionalRequest() {{
                 setRequestId(request.getRequestId());
-                setAssignedProfessionalId(request.getAssignedProfessionalId());
+                setAssignedProfessionalId(professionalId);
                 setInstructions(request.getInstructions());
             }});
             return ResponseEntity.ok(out);
         }
         if (RequestType.PROJECT == type) {
-            Project out = projectService.adminAssignProfessional(request.getRequestId(), request.getAssignedProfessionalId(), request.getInstructions(), user);
+            Project out = projectService.adminAssignProfessional(request.getRequestId(), professionalId, request.getInstructions(), user);
             return ResponseEntity.ok(out);
         }
         if (RequestType.BOOKING == type) {
-            Booking out = spaceService.adminAssignProfessional(request.getRequestId(), request.getAssignedProfessionalId(), request.getInstructions(), user);
+            Booking out = spaceService.adminAssignProfessional(request.getRequestId(), professionalId, request.getInstructions(), user);
             return ResponseEntity.ok(out);
         }
         throw new com.org.cmbms.common.exception.ApiException("Unsupported requestType for this endpoint");

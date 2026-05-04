@@ -40,7 +40,7 @@ public class ProjectRequestDTO {
     private String classification;
     @NotBlank
     private String priority;
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
     private String requestMode;
     private String linkedProjectId;
     private Map<String, Object> scope;

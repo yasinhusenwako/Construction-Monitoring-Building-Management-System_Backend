@@ -10,8 +10,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SpaceRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
-    List<Booking> findByDivisionId(Long divisionId);
-    List<Booking> findByAssignedProfessionalId(Long assignedProfessionalId);
+    List<Booking> findByDivisionId(String divisionId);
+    List<Booking> findByAssignedProfessionalId(String assignedProfessionalId); // Changed to String
+    List<Booking> findByAssignedSupervisorId(String assignedSupervisorId); // Changed to String
     List<Booking> findByTypeAndLayoutAndDateTimeBetween(String type, String layout, LocalDateTime start, LocalDateTime end);
     Optional<Booking> findByBookingId(String bookingId);
 }

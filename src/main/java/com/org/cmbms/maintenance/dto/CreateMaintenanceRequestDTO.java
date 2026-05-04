@@ -18,6 +18,6 @@ public class CreateMaintenanceRequestDTO {
     private String description;
     @NotBlank
     private String location;
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
 }
 

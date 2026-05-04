@@ -17,7 +17,7 @@ public class WorkOrder {
     @Column(name = "maintenanceRequestId")
     private Long maintenanceRequestId;
     @Column(name = "assignedProfessionalId")
-    private Long assignedProfessionalId;
+    private String assignedProfessionalId; // Changed to String to support both numeric IDs and email identifiers
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
     @Enumerated(EnumType.STRING)

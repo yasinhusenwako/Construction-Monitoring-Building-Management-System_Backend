@@ -15,15 +15,16 @@ public class BookingRequestDTO {
     @NotBlank
     private String type;
     @NotNull
-    private Long requester;
+    private String requester; // Changed to String to support both numeric IDs and email identifiers
     @NotNull
     private LocalDateTime dateTime;
+    private LocalDateTime endTime;
     @NotNull
     private Integer capacity;
     @NotBlank
     private String layout;
     @NotBlank
     private String amenities;
-    private Long divisionId;
+    private String divisionId; // Changed to String to support "DIV-001" format
 }
 

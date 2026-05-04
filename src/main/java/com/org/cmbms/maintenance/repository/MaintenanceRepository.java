@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MaintenanceRepository extends JpaRepository<MaintenanceRequest, Long>, JpaSpecificationExecutor<MaintenanceRequest> {
-    List<MaintenanceRequest> findByDivisionId(Long divisionId);
-    List<MaintenanceRequest> findByAssignedSupervisorId(Long supervisorId);
-    List<MaintenanceRequest> findByAssignedProfessionalId(Long professionalId);
-    List<MaintenanceRequest> findByCreatedBy(Long createdBy);
+    List<MaintenanceRequest> findByDivisionId(String divisionId);
+    List<MaintenanceRequest> findByAssignedSupervisorId(String supervisorId); // Changed to String
+    List<MaintenanceRequest> findByAssignedProfessionalId(String professionalId); // Changed to String
+    List<MaintenanceRequest> findByCreatedBy(String createdBy); // Changed to String
     List<MaintenanceRequest> findByStatus(Status status);
     Optional<MaintenanceRequest> findByMaintenanceId(String maintenanceId);
 }

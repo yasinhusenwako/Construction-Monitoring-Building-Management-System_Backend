@@ -36,8 +36,8 @@ public class MaintenanceController {
     public ResponseEntity<List<MaintenanceRequest>> search(@RequestParam(required = false) String status,
                                                            @RequestParam(required = false) String priority,
                                                            @RequestParam(required = false) String maintenanceId,
-                                                           @RequestParam(required = false) Long divisionId,
-                                                           @RequestParam(required = false) Long createdBy) {
+                                                           @RequestParam(required = false) String divisionId,
+                                                           @RequestParam(required = false) String createdBy) { // Changed to String
         UserPrincipal user = SecurityUtils.getCurrentUser();
         return ResponseEntity.ok(maintenanceService.search(user, status, priority, maintenanceId, divisionId, createdBy));
     }
@@ -45,7 +45,7 @@ public class MaintenanceController {
     @PostMapping("/{id}/assign-professional")
     public ResponseEntity<MaintenanceRequest> assignProfessional(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
         UserPrincipal user = SecurityUtils.getCurrentUser();
-        Long professionalId = Long.valueOf(body.get("professionalId").toString());
+        String professionalId = body.get("professionalId").toString();
         String instructions = body.get("instructions") != null ? body.get("instructions").toString() : "";
         return ResponseEntity.ok(maintenanceService.adminAssignProfessional(id, professionalId, instructions, user));
     }

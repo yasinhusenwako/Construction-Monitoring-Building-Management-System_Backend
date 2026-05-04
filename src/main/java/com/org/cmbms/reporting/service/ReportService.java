@@ -3,6 +3,7 @@ package com.org.cmbms.reporting.service;
 
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.maintenance.model.MaintenanceRequest;
+import com.org.cmbms.maintenance.model.WorkOrder;
 import com.org.cmbms.maintenance.repository.MaintenanceRepository;
 import com.org.cmbms.maintenance.repository.WorkOrderRepository;
 import com.org.cmbms.user.repository.UserRepository;
@@ -50,15 +51,15 @@ public class ReportService {
 
     public Map<String, Object> analytics() {
         List<MaintenanceRequest> all = maintenanceRepository.findAll();
-        Map<Long, Long> byDivision = all.stream()
+        Map<String, Long> byDivision = all.stream()
                 .filter(r -> r.getDivisionId() != null)
                 .collect(Collectors.groupingBy(MaintenanceRequest::getDivisionId, Collectors.counting()));
-        Map<Long, Long> supervisorPerformance = all.stream()
+        Map<String, Long> supervisorPerformance = all.stream()
                 .filter(r -> r.getAssignedSupervisorId() != null)
                 .collect(Collectors.groupingBy(MaintenanceRequest::getAssignedSupervisorId, Collectors.counting()));
-        Map<Long, Long> professionalWorkload = workOrderRepository.findAll().stream()
+        Map<String, Long> professionalWorkload = workOrderRepository.findAll().stream()
                 .filter(w -> w.getAssignedProfessionalId() != null)
-                .collect(Collectors.groupingBy(w -> w.getAssignedProfessionalId(), Collectors.counting()));
+                .collect(Collectors.groupingBy(WorkOrder::getAssignedProfessionalId, Collectors.counting()));
 
         Map<String, Object> out = new HashMap<>();
         out.put("requestsByDivision", byDivision);

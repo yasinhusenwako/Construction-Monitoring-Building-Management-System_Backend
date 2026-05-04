@@ -12,20 +12,39 @@ import java.util.List;
 
 @Getter
 public class UserPrincipal implements UserDetails {
-    private final Long id;
+    private final String id; // Changed to String to support both numeric IDs and email identifiers
     private final String name;
     private final String email;
     private final String password;
     private final Role role;
-    private final Long divisionId;
+    private final String divisionId; // Changed to String to support "DIV-001" format
 
     public UserPrincipal(User user) {
-        this.id = user.getId();
+        this.id = String.valueOf(user.getId());
         this.name = user.getName();
         this.email = user.getEmail();
         this.password = user.getPassword();
         this.role = user.getRole();
-        this.divisionId = user.getDivisionId();
+        this.divisionId = user.getDivisionId(); // Already String in User model
+    }
+
+    // Constructor for Keycloak users (without database User object)
+    public UserPrincipal(String id, String name, String email, Role role, String divisionId) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.password = ""; // Keycloak users don't have passwords in our system
+        this.role = role;
+        this.divisionId = divisionId;
+    }
+    
+    // Helper method to get numeric ID (for backward compatibility with database users)
+    public Long getNumericId() {
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            return null; // Return null for Keycloak users (email-based IDs)
+        }
     }
 
     @Override

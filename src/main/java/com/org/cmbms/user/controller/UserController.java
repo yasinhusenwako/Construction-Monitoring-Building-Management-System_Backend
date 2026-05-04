@@ -44,4 +44,25 @@ public class UserController {
         userService.deleteUser(id, currentUser);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Get professionals by division ID
+     * For admin: divisionId=0 returns admin professionals (for projects/bookings)
+     * For supervisors: divisionId=1,2,3 returns division professionals (for maintenance)
+     */
+    @GetMapping("/professionals")
+    public ResponseEntity<List<User>> getProfessionalsByDivision(
+            @RequestParam(required = false) String divisionId) {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(userService.getProfessionalsByDivision(divisionId, currentUser));
+    }
+
+    /**
+     * Get all professionals (admin only)
+     */
+    @GetMapping("/professionals/all")
+    public ResponseEntity<List<User>> getAllProfessionals() {
+        UserPrincipal currentUser = SecurityUtils.getCurrentUser();
+        return ResponseEntity.ok(userService.getAllProfessionals(currentUser));
+    }
 }

@@ -20,7 +20,8 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<List<Notification>> getNotifications() {
         UserPrincipal user = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
+        String userId = user.getId();  // Works for both numeric IDs and emails
+        return ResponseEntity.ok(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId));
     }
 
     @PatchMapping("/{id}/read")
@@ -30,7 +31,8 @@ public class NotificationController {
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
         
         // Ensure user can only mark their own notifications as read
-        if (!notification.getUserId().equals(user.getId())) {
+        String userId = user.getId();
+        if (!notification.getUserId().equals(userId)) {
             throw new RuntimeException("Access denied");
         }
         
@@ -41,7 +43,8 @@ public class NotificationController {
     @PatchMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead() {
         UserPrincipal user = SecurityUtils.getCurrentUser();
-        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        String userId = user.getId();  // Works for both numeric IDs and emails
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
         notifications.forEach(n -> n.setIsRead(Boolean.TRUE));
         notificationRepository.saveAll(notifications);
         return ResponseEntity.ok().build();

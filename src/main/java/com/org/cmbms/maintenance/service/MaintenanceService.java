@@ -2,6 +2,7 @@
 package com.org.cmbms.maintenance.service;
 
 import com.org.cmbms.auth.security.UserPrincipal;
+import com.org.cmbms.common.enums.RequestType;
 import com.org.cmbms.common.enums.Role;
 import com.org.cmbms.common.enums.Status;
 import com.org.cmbms.common.exception.ApiException;
@@ -9,12 +10,20 @@ import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.maintenance.dto.CreateMaintenanceRequestDTO;
 import com.org.cmbms.maintenance.model.MaintenanceRequest;
 import com.org.cmbms.maintenance.repository.MaintenanceRepository;
+import com.org.cmbms.user.model.User;
+import com.org.cmbms.user.repository.UserRepository;
+import com.org.cmbms.workflow.service.RequestLifecycleService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +35,8 @@ public class MaintenanceService {
     private final MaintenanceRepository maintenanceRepository;
     private final WorkflowService workflowService;
     private final com.org.cmbms.file.service.FileStorageService fileStorageService;
+    private final UserRepository userRepository;
+    private final RequestLifecycleService requestLifecycleService;
 
     public MaintenanceRequest create(CreateMaintenanceRequestDTO dto, UserPrincipal user) {
         MaintenanceRequest request = new MaintenanceRequest();
@@ -41,7 +52,13 @@ public class MaintenanceService {
         }
         request.setDivisionId(dto.getDivisionId());
         MaintenanceRequest saved = maintenanceRepository.save(request);
-        workflowService.initializeSubmittedStatus(saved, user.getId());
+        Long userNumericId = user.getNumericId() != null ? user.getNumericId() : 0L;
+        workflowService.initializeSubmittedStatus(saved, userNumericId);
+        
+        // Notify all admins (both database and Keycloak) about new maintenance submission
+        requestLifecycleService.notifyUsersByRole(Role.ADMIN, "New Maintenance Request", 
+            "Maintenance " + saved.getMaintenanceId() + " has been submitted by " + user.getEmail());
+        
         return maintenanceRepository.save(saved);
     }
 
@@ -83,11 +100,24 @@ public class MaintenanceService {
                                            String status,
                                            String priority,
                                            String maintenanceId,
-                                           Long divisionId,
-                                           Long createdBy) {
+                                           String divisionId,
+                                           String createdBy) { // Changed to String
         // Professionals only see their assigned requests
         if (user.getRole() == Role.PROFESSIONAL) {
-            return maintenanceRepository.findByAssignedProfessionalId(user.getId());
+            // Use email as ID for Keycloak users
+            String professionalId = user.getId();
+            System.out.println("=== PROFESSIONAL FETCHING MAINTENANCE ===");
+            System.out.println("Professional ID: " + professionalId);
+            System.out.println("Professional Email: " + user.getEmail());
+            System.out.println("Professional Role: " + user.getRole());
+            
+            List<MaintenanceRequest> requests = maintenanceRepository.findByAssignedProfessionalId(professionalId);
+            System.out.println("Found " + requests.size() + " maintenance requests assigned to professional");
+            for (MaintenanceRequest m : requests) {
+                System.out.println("  - Maintenance: " + m.getMaintenanceId() + ", Assigned to: " + m.getAssignedProfessionalId());
+            }
+            
+            return requests;
         }
         
         // Supervisors need a division
@@ -95,12 +125,35 @@ public class MaintenanceService {
             throw new ApiException("Division not set for supervisor");
         }
         
+        // Supervisors only see requests assigned to them OR in their division
+        if (user.getRole() == Role.SUPERVISOR) {
+            String supervisorId = user.getId();
+            System.out.println("=== SUPERVISOR FETCHING MAINTENANCE ===");
+            System.out.println("Supervisor ID: " + supervisorId);
+            System.out.println("Supervisor Email: " + user.getEmail());
+            System.out.println("Supervisor Division: " + user.getDivisionId());
+            
+            // Find by assigned supervisor ID OR by division
+            List<MaintenanceRequest> assignedToMe = maintenanceRepository.findByAssignedSupervisorId(supervisorId);
+            List<MaintenanceRequest> inMyDivision = maintenanceRepository.findByDivisionId(user.getDivisionId());
+            
+            // Combine and deduplicate
+            Set<MaintenanceRequest> combined = new HashSet<>(assignedToMe);
+            combined.addAll(inMyDivision);
+            
+            System.out.println("Found " + assignedToMe.size() + " maintenance requests assigned to supervisor");
+            System.out.println("Found " + inMyDivision.size() + " maintenance requests in supervisor's division");
+            System.out.println("Total unique: " + combined.size());
+            
+            return new ArrayList<>(combined);
+        }
+        
         // Users only see their own requests
         if (user.getRole() == Role.USER) {
             return maintenanceRepository.findByCreatedBy(user.getId());
         }
         
-        // Admin and Supervisors can search with filters
+        // Admin can search with filters
         Specification<MaintenanceRequest> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -118,17 +171,13 @@ public class MaintenanceService {
             if (createdBy != null) {
                 predicates.add(cb.equal(root.get("createdBy"), createdBy));
             }
-            // Supervisors only see requests in their division
-            if (user.getRole() == Role.SUPERVISOR) {
-                predicates.add(cb.equal(root.get("divisionId"), user.getDivisionId()));
-            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         return maintenanceRepository.findAll(spec);
     }
 
     @Transactional
-    public MaintenanceRequest adminAssignProfessional(Long id, Long professionalId, String instructions, UserPrincipal admin) {
+    public MaintenanceRequest adminAssignProfessional(Long id, String professionalId, String instructions, UserPrincipal admin) {
         if (admin.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
@@ -196,7 +245,9 @@ public class MaintenanceService {
         }
         MaintenanceRequest maintenance = maintenanceRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        requestLifecycleService.transition(RequestType.MAINTENANCE, maintenance.getId(), Status.APPROVED, admin.getId());
         maintenance.setStatus(Status.APPROVED);
+        requestLifecycleService.notifyUser(maintenance.getCreatedBy(), "Maintenance approved", "Maintenance request " + maintenance.getMaintenanceId() + " approved");
         return maintenanceRepository.save(maintenance);
     }
 
@@ -206,12 +257,14 @@ public class MaintenanceService {
         }
         MaintenanceRequest maintenance = maintenanceRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Maintenance request not found"));
+        requestLifecycleService.transition(RequestType.MAINTENANCE, maintenance.getId(), Status.REJECTED, admin.getId());
         maintenance.setStatus(Status.REJECTED);
         maintenance.setRejectionReason(reason);
         String notificationMessage = "Maintenance request " + maintenance.getMaintenanceId() + " rejected";
         if (reason != null && !reason.isBlank()) {
             notificationMessage += ". Reason: " + reason;
         }
+        requestLifecycleService.notifyUser(maintenance.getCreatedBy(), "Maintenance rejected", notificationMessage);
         return maintenanceRepository.save(maintenance);
     }
 }
