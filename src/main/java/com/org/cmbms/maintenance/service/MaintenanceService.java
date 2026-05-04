@@ -128,6 +128,10 @@ public class MaintenanceService {
         // Supervisors only see requests assigned to them OR in their division
         if (user.getRole() == Role.SUPERVISOR) {
             String supervisorId = user.getId();
+            Set<String> divisionAliases = DivisionRules.aliases(user.getDivisionId());
+            if (divisionAliases.isEmpty()) {
+                throw new ApiException("Invalid division set for supervisor");
+            }
             System.out.println("=== SUPERVISOR FETCHING MAINTENANCE ===");
             System.out.println("Supervisor ID: " + supervisorId);
             System.out.println("Supervisor Email: " + user.getEmail());
@@ -135,7 +139,7 @@ public class MaintenanceService {
             
             // Find by assigned supervisor ID OR by division
             List<MaintenanceRequest> assignedToMe = maintenanceRepository.findByAssignedSupervisorId(supervisorId);
-            List<MaintenanceRequest> inMyDivision = maintenanceRepository.findByDivisionId(user.getDivisionId());
+            List<MaintenanceRequest> inMyDivision = maintenanceRepository.findByDivisionIdIn(new ArrayList<>(divisionAliases));
             
             // Combine and deduplicate
             Set<MaintenanceRequest> combined = new HashSet<>(assignedToMe);
@@ -166,7 +170,12 @@ public class MaintenanceService {
                 predicates.add(cb.equal(root.get("maintenanceId"), maintenanceId));
             }
             if (divisionId != null) {
-                predicates.add(cb.equal(root.get("divisionId"), divisionId));
+                Set<String> aliases = DivisionRules.aliases(divisionId);
+                if (aliases.isEmpty()) {
+                    predicates.add(cb.equal(root.get("divisionId"), divisionId));
+                } else {
+                    predicates.add(root.get("divisionId").in(aliases));
+                }
             }
             if (createdBy != null) {
                 predicates.add(cb.equal(root.get("createdBy"), createdBy));

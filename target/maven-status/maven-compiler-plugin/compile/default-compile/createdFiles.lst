@@ -7,7 +7,6 @@ com\org\cmbms\user\dto\KeycloakUserUpdateRequest$KeycloakUserUpdateRequestBuilde
 com\org\cmbms\user\model\User.class
 com\org\cmbms\config\CorsConfig.class
 com\org\cmbms\reporting\controller\ReportController.class
-com\org\cmbms\notification\SmsService.class
 com\org\cmbms\user\dto\KeycloakUserCreateRequest$KeycloakUserCreateRequestBuilder.class
 com\org\cmbms\maintenance\model\StatusHistory.class
 com\org\cmbms\common\exception\ApiException.class
@@ -31,7 +30,6 @@ com\org\cmbms\common\enums\Status.class
 com\org\cmbms\user\dto\KeycloakUserCreateRequest.class
 com\org\cmbms\preventive\repository\PreventiveScheduleRepository.class
 com\org\cmbms\CmbmsApplication.class
-com\org\cmbms\config\JwtConfig.class
 com\org\cmbms\preventive\controller\PreventiveScheduleController.class
 com\org\cmbms\maintenance\controller\MaintenanceController.class
 com\org\cmbms\notification\controller\NotificationController.class
@@ -40,7 +38,6 @@ com\org\cmbms\user\repository\UserRepository.class
 com\org\cmbms\file\controller\FileController$FileSizeExceededException.class
 com\org\cmbms\space\repository\SpaceRepository.class
 com\org\cmbms\project\dto\BoqResponse.class
-com\org\cmbms\maintenance\dto\MaintenanceDocUploadResponse.class
 com\org\cmbms\reporting\service\ReportService.class
 com\org\cmbms\maintenance\dto\AdminAssignRequest.class
 com\org\cmbms\auth\security\UserPrincipal.class
@@ -58,19 +55,16 @@ com\org\cmbms\file\model\FileRecord.class
 com\org\cmbms\project\model\Project.class
 com\org\cmbms\division\model\Division.class
 com\org\cmbms\preventive\service\PreventiveScheduleService.class
-com\org\cmbms\config\SwaggerConfig.class
 com\org\cmbms\notification\model\Notification.class
 com\org\cmbms\user\dto\UserUpdateRequest.class
 com\org\cmbms\preventive\model\PreventiveSchedule.class
 com\org\cmbms\file\service\FileStorageService.class
-com\org\cmbms\auth\service\KeycloakUserService.class
 com\org\cmbms\history\service\RequestHistoryService.class
 com\org\cmbms\user\dto\KeycloakUserDTO.class
 com\org\cmbms\maintenance\dto\ReviewRequest.class
 com\org\cmbms\maintenance\dto\AssignGenericRequest.class
 com\org\cmbms\FlywayConfig.class
 com\org\cmbms\common\util\DivisionRules.class
-com\org\cmbms\notification\EmailService.class
 com\org\cmbms\workflow\service\RequestLifecycleService.class
 com\org\cmbms\config\SecurityUtilsConfig.class
 com\org\cmbms\maintenance\dto\CreateMaintenanceRequestDTO.class

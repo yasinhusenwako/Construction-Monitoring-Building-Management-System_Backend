@@ -1,7 +1,6 @@
 package com.org.cmbms.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.keycloak.adapters.springboot.KeycloakSpringBootConfigResolver;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,11 +22,6 @@ public class KeycloakConfig {
 
     @Value("${keycloak.admin.client-secret}")
     private String clientSecret;
-
-    @Bean
-    public KeycloakSpringBootConfigResolver keycloakConfigResolver() {
-        return new KeycloakSpringBootConfigResolver();
-    }
 
     @Value("${keycloak.admin.username:admin}")
     private String username;

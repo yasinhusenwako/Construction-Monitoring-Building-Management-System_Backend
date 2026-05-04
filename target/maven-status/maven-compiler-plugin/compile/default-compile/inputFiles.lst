@@ -1,5 +1,4 @@
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\auth\security\UserPrincipal.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\auth\service\KeycloakUserService.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\CmbmsApplication.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\common\enums\RequestType.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\common\enums\Role.java
@@ -11,11 +10,9 @@ C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\c
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\common\util\DivisionRules.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\common\util\IdGenerator.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\CorsConfig.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\JwtConfig.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\KeycloakConfig.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\SecurityConfigKeycloak.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\SecurityUtilsConfig.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\config\SwaggerConfig.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\division\controller\DivisionController.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\division\model\Division.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\division\repository\DivisionRepository.java
@@ -41,7 +38,6 @@ C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\c
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\AssignSupervisorRequest.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\CostUpdateRequest.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\CreateMaintenanceRequestDTO.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\MaintenanceDocUploadResponse.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\ReviewRequest.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\dto\TaskStatusUpdateRequest.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\model\MaintenanceRequest.java
@@ -53,10 +49,8 @@ C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\c
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\service\MaintenanceService.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\maintenance\service\WorkflowService.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\notification\controller\NotificationController.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\notification\EmailService.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\notification\model\Notification.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\notification\repository\NotificationRepository.java
-C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\notification\SmsService.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\preventive\controller\PreventiveScheduleController.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\preventive\dto\PreventiveScheduleRequest.java
 C:\Users\user\Desktop\Folders\Applications\CSBMS\Backend\src\main\java\com\org\cmbms\preventive\model\PreventiveSchedule.java
