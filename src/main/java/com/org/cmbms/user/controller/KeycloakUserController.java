@@ -90,12 +90,9 @@ public class KeycloakUserController {
             request.getRoles()
         );
 
-        // Update user attributes if provided
-        if (request.getPhone() != null || request.getDepartment() != null || 
-            request.getDivisionId() != null || request.getProfession() != null) {
-            updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
-                               request.getDivisionId(), request.getProfession());
-        }
+        // Always update user attributes (even if empty, to ensure consistency)
+        updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
+                           request.getDivisionId(), request.getProfession());
 
         Map<String, String> response = new HashMap<>();
         response.put("id", userId);
@@ -130,12 +127,9 @@ public class KeycloakUserController {
             request.getRoles()
         );
 
-        // Update user attributes if provided
-        if (request.getPhone() != null || request.getDepartment() != null || 
-            request.getDivisionId() != null || request.getProfession() != null) {
-            updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
-                               request.getDivisionId(), request.getProfession());
-        }
+        // Always update user attributes (to handle clearing attributes)
+        updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
+                           request.getDivisionId(), request.getProfession());
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "User updated successfully");
@@ -315,17 +309,29 @@ public class KeycloakUserController {
                 attributes = new HashMap<>();
             }
 
-            if (phone != null) {
-                attributes.put("phone", List.of(phone));
+            // Update or remove attributes based on whether they're provided and non-empty
+            if (phone != null && !phone.trim().isEmpty()) {
+                attributes.put("phone", List.of(phone.trim()));
+            } else if (phone != null && phone.trim().isEmpty()) {
+                attributes.remove("phone");
             }
-            if (department != null) {
-                attributes.put("department", List.of(department));
+            
+            if (department != null && !department.trim().isEmpty()) {
+                attributes.put("department", List.of(department.trim()));
+            } else if (department != null && department.trim().isEmpty()) {
+                attributes.remove("department");
             }
-            if (divisionId != null) {
-                attributes.put("divisionId", List.of(divisionId));
+            
+            if (divisionId != null && !divisionId.trim().isEmpty()) {
+                attributes.put("divisionId", List.of(divisionId.trim()));
+            } else if (divisionId != null && divisionId.trim().isEmpty()) {
+                attributes.remove("divisionId");
             }
-            if (profession != null) {
-                attributes.put("profession", List.of(profession));
+            
+            if (profession != null && !profession.trim().isEmpty()) {
+                attributes.put("profession", List.of(profession.trim()));
+            } else if (profession != null && profession.trim().isEmpty()) {
+                attributes.remove("profession");
             }
 
             user.setAttributes(attributes);

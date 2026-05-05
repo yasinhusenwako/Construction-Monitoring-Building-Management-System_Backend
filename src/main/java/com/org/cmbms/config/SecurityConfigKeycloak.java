@@ -41,7 +41,9 @@ public class SecurityConfigKeycloak {
                 .requestMatchers(
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
-                    "/actuator/health"
+                    "/actuator/health",
+                    "/api/history/backfill-actors",
+                    "/api/history/debug/**"
                 ).permitAll()
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -79,13 +81,13 @@ public class SecurityConfigKeycloak {
         // This avoids the issuer validation issue
         org.springframework.security.oauth2.jwt.NimbusJwtDecoder jwtDecoder = 
             org.springframework.security.oauth2.jwt.NimbusJwtDecoder
-                .withJwkSetUri("http://localhost:8090/realms/insa/protocol/openid-connect/certs")
+                .withJwkSetUri("http://localhost:8090/realms/buildms/protocol/openid-connect/certs")
                 .build();
         
         // Set custom validator that only validates issuer
         jwtDecoder.setJwtValidator(
             org.springframework.security.oauth2.jwt.JwtValidators
-                .createDefaultWithIssuer("http://localhost:8090/realms/insa")
+                .createDefaultWithIssuer("http://localhost:8090/realms/buildms")
         );
         
         return jwtDecoder;
@@ -130,7 +132,7 @@ public class SecurityConfigKeycloak {
             Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
             Collection<String> resourceRoles = List.of();
             if (resourceAccess != null) {
-                Map<String, Object> clientResource = (Map<String, Object>) resourceAccess.get("insa-backend");
+                Map<String, Object> clientResource = (Map<String, Object>) resourceAccess.get("buildms-backend");
                 if (clientResource != null) {
                     resourceRoles = (Collection<String>) clientResource.get("roles");
                 }

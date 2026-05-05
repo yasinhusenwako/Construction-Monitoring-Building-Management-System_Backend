@@ -11,8 +11,26 @@ public final class DivisionRules {
     private DivisionRules() {
     }
 
+    /**
+     * Normalize a divisionId to the canonical "DIV-00X" format.
+     * Accepts both "1" and "DIV-001" style inputs.
+     */
+    public static String normalize(String divisionId) {
+        if (divisionId == null) return null;
+        String trimmed = divisionId.trim();
+        // Already in canonical form
+        if (trimmed.startsWith("DIV-")) return trimmed;
+        // Plain numeric: "1" → "DIV-001"
+        try {
+            int num = Integer.parseInt(trimmed);
+            return String.format("DIV-%03d", num);
+        } catch (NumberFormatException e) {
+            return trimmed; // Return as-is; assertAllowed will reject it
+        }
+    }
+
     public static boolean isAllowed(String divisionId) {
-        return divisionId != null && ALLOWED_DIVISION_IDS.contains(divisionId);
+        return divisionId != null && ALLOWED_DIVISION_IDS.contains(normalize(divisionId));
     }
 
     public static void assertAllowed(String divisionId) {

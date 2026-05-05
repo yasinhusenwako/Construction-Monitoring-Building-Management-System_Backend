@@ -61,11 +61,19 @@ public class RequestLifecycleService {
     public void initialize(RequestType type, Long requestId, String changedBy) {
         // Try to parse changedBy as Long for database users
         Long numericChangedBy = null;
+        String actorName = null;
         try {
             numericChangedBy = Long.parseLong(changedBy);
         } catch (NumberFormatException e) {
             // Keycloak user (email-based ID) - use 0 as placeholder
             numericChangedBy = 0L;
+            try {
+                actorName = keycloakAdminService.getUserDisplayName(changedBy);
+            } catch (Exception ex) {
+                actorName = changedBy.contains("@")
+                    ? changedBy.split("@")[0].replace(".", " ").replace("_", " ")
+                    : changedBy;
+            }
         }
         
         StatusHistory history = new StatusHistory();
@@ -75,7 +83,13 @@ public class RequestLifecycleService {
         history.setChangedBy(numericChangedBy);
         history.setTimestamp(LocalDateTime.now());
         statusHistoryRepository.save(history);
-        recordRequestHistory(requestId, type, Status.SUBMITTED, numericChangedBy, "Request Created", null);
+        
+        if (actorName != null) {
+            requestHistoryService.recordHistory(requestId, type.name(), "Request Created",
+                    Status.SUBMITTED.getValue(), actorName, numericChangedBy, null);
+        } else {
+            recordRequestHistory(requestId, type, Status.SUBMITTED, numericChangedBy, "Request Created", null);
+        }
     }
     
     // Overload for backward compatibility with Long changedBy
@@ -139,12 +153,50 @@ public class RequestLifecycleService {
     @Transactional
     public void transition(RequestType type, Long requestId, Status next, String changedBy) {
         Long numericChangedBy = null;
+        String actorName = null;
         try {
             numericChangedBy = Long.parseLong(changedBy);
         } catch (NumberFormatException e) {
-            numericChangedBy = 0L; // Keycloak user placeholder
+            // Keycloak user (email) - use 0 as placeholder but preserve name from email
+            numericChangedBy = 0L;
+            // Try to get name from Keycloak via admin service
+            try {
+                actorName = keycloakAdminService.getUserDisplayName(changedBy);
+            } catch (Exception ex) {
+                // Fallback: derive name from email prefix
+                actorName = changedBy.contains("@")
+                    ? changedBy.split("@")[0].replace(".", " ").replace("_", " ")
+                    : changedBy;
+            }
         }
-        transition(type, requestId, next, numericChangedBy);
+        
+        Status current = getCurrentStatus(type, requestId);
+        if (current == null) {
+            if (next != Status.SUBMITTED) {
+                throw new ApiException("First status must be Submitted");
+            }
+        } else {
+            Map<Status, EnumSet<Status>> transitions = getTransitions(type);
+            EnumSet<Status> allowed = transitions.get(current);
+            if (allowed == null || !allowed.contains(next)) {
+                throw new ApiException("Invalid transition: " + current.getValue() + " -> " + next.getValue());
+            }
+        }
+        StatusHistory history = new StatusHistory();
+        history.setRequestId(requestId);
+        history.setRequestType(type);
+        history.setStatus(next);
+        history.setChangedBy(numericChangedBy);
+        history.setTimestamp(LocalDateTime.now());
+        statusHistoryRepository.save(history);
+
+        // Pass actorName directly if it's a Keycloak user
+        if (actorName != null) {
+            requestHistoryService.recordHistory(requestId, type.name(), next.getValue(),
+                    next != null ? next.getValue() : null, actorName, numericChangedBy, null);
+        } else {
+            recordRequestHistory(requestId, type, next, numericChangedBy, next.getValue(), null);
+        }
     }
 
     public void recordNote(RequestType type, Long requestId, Long actorId, String note) {

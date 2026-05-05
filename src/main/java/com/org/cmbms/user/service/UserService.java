@@ -13,8 +13,11 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,19 +27,19 @@ public class UserService {
     private final KeycloakAdminService keycloakAdminService;
 
     public List<User> allUsers(UserPrincipal currentUser) {
-        // Get database users
-        List<User> dbUsers = userRepository.findAll();
+        // Get Keycloak users first (primary source)
+        List<User> allUsers = new ArrayList<>();
+        Set<String> keycloakEmails = new HashSet<>();
         
-        // Get Keycloak users and convert to User objects
         try {
             List<UserRepresentation> keycloakUsers = keycloakAdminService.getAllUsers();
-            List<User> allUsers = new ArrayList<>(dbUsers);
             
             for (UserRepresentation kcUser : keycloakUsers) {
                 // Convert Keycloak user to User object
                 User user = new User();
                 
                 String email = kcUser.getEmail() != null ? kcUser.getEmail() : kcUser.getUsername();
+                keycloakEmails.add(email); // Track Keycloak emails
                 
                 // IMPORTANT: For Keycloak users, we use a special ID format that the frontend can recognize
                 // Format: "KC:<email>" - this tells the frontend to use the email as the professional ID
@@ -94,11 +97,19 @@ public class UserService {
                 allUsers.add(user);
             }
             
+            // Add database users that don't exist in Keycloak (fallback only)
+            List<User> dbUsers = userRepository.findAll();
+            for (User dbUser : dbUsers) {
+                if (dbUser.getEmail() != null && !keycloakEmails.contains(dbUser.getEmail())) {
+                    allUsers.add(dbUser);
+                }
+            }
+            
             return allUsers;
         } catch (Exception e) {
-            // If Keycloak is not available, just return database users
+            // If Keycloak is not available, fall back to database users only
             System.err.println("Failed to fetch Keycloak users: " + e.getMessage());
-            return dbUsers;
+            return userRepository.findAll();
         }
     }
 

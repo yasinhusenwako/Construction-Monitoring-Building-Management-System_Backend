@@ -309,6 +309,29 @@ public class KeycloakAdminService {
     }
 
     /**
+     * Get display name for a Keycloak user by email
+     */
+    public String getUserDisplayName(String email) {
+        try {
+            RealmResource realmResource = keycloakAdminClient.realm(realm);
+            List<UserRepresentation> users = realmResource.users().searchByEmail(email, true);
+            if (!users.isEmpty()) {
+                UserRepresentation user = users.get(0);
+                String firstName = user.getFirstName() != null ? user.getFirstName() : "";
+                String lastName = user.getLastName() != null ? user.getLastName() : "";
+                String fullName = (firstName + " " + lastName).trim();
+                return fullName.isEmpty() ? user.getUsername() : fullName;
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve display name for email: {}", email);
+        }
+        // Fallback: derive from email prefix
+        return email.contains("@")
+            ? email.split("@")[0].replace(".", " ").replace("_", " ")
+            : email;
+    }
+
+    /**
      * Update user custom attributes
      */
     public void updateUserAttributes(String userId, Map<String, List<String>> attributes) {

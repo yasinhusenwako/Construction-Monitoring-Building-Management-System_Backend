@@ -60,7 +60,9 @@ public class WorkflowService {
         if (supervisor.getDivisionId() == null) {
             throw new ApiException("Division not set for supervisor");
         }
-        return maintenanceRepository.findByDivisionId(supervisor.getDivisionId());
+        // Normalize to canonical format so "1" and "DIV-001" both match DB records
+        String divisionId = DivisionRules.normalize(supervisor.getDivisionId());
+        return maintenanceRepository.findByDivisionId(divisionId);
     }
 
     public List<MaintenanceRequest> getProfessionalTasks(UserPrincipal professional) {
@@ -81,9 +83,11 @@ public class WorkflowService {
         if (request.getDivisionId() == null) {
             throw new ApiException("Division REQUIRED before assignment");
         }
-        DivisionRules.assertAllowed(request.getDivisionId());
+        // Normalize divisionId to canonical format (e.g. "1" → "DIV-001")
+        String normalizedDivisionId = DivisionRules.normalize(request.getDivisionId());
+        DivisionRules.assertAllowed(normalizedDivisionId);
         MaintenanceRequest maintenance = getMaintenance(request.getRequestId());
-        maintenance.setDivisionId(request.getDivisionId());
+        maintenance.setDivisionId(normalizedDivisionId);
         if (request.getPriority() != null && !request.getPriority().isBlank()) {
             maintenance.setPriority(request.getPriority());
         }
@@ -101,7 +105,7 @@ public class WorkflowService {
                 if (supervisor.getRole() != Role.SUPERVISOR) {
                     throw new ApiException("Selected user is not a supervisor");
                 }
-                if (supervisor.getDivisionId() == null || !supervisor.getDivisionId().equals(request.getDivisionId())) {
+                if (supervisor.getDivisionId() == null || !DivisionRules.normalize(supervisor.getDivisionId()).equals(DivisionRules.normalize(request.getDivisionId()))) {
                     throw new ApiException("Supervisor must belong to selected division");
                 }
             } catch (NumberFormatException e) {
@@ -152,8 +156,9 @@ public class WorkflowService {
         
         // If maintenance doesn't have a division yet, assign supervisor's division
         if (maintenance.getDivisionId() == null) {
-            maintenance.setDivisionId(supervisor.getDivisionId());
-        } else if (!maintenance.getDivisionId().equals(supervisor.getDivisionId())) {
+            maintenance.setDivisionId(DivisionRules.normalize(supervisor.getDivisionId()));
+        } else if (!DivisionRules.normalize(maintenance.getDivisionId())
+                .equals(DivisionRules.normalize(supervisor.getDivisionId()))) {
             throw new ApiException("supervisor sees only division requests");
         }
         
@@ -267,8 +272,8 @@ public class WorkflowService {
         
         // If maintenance doesn't have a division yet, assign supervisor's division
         if (maintenance.getDivisionId() == null) {
-            maintenance.setDivisionId(supervisor.getDivisionId());
-        } else if (supervisor.getRole() == Role.SUPERVISOR && !supervisor.getDivisionId().equals(maintenance.getDivisionId())) {
+            maintenance.setDivisionId(DivisionRules.normalize(supervisor.getDivisionId()));
+        } else if (supervisor.getRole() == Role.SUPERVISOR && !DivisionRules.normalize(supervisor.getDivisionId()).equals(DivisionRules.normalize(maintenance.getDivisionId()))) {
             throw new ApiException("supervisor sees only division requests");
         }
         

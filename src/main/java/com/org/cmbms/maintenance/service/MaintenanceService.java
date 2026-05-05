@@ -134,8 +134,10 @@ public class MaintenanceService {
             System.out.println("Supervisor Division: " + user.getDivisionId());
             
             // Find by assigned supervisor ID OR by division
+            // Normalize divisionId: Keycloak stores "1", DB stores "DIV-001"
+            String normalizedDivisionId = DivisionRules.normalize(user.getDivisionId());
             List<MaintenanceRequest> assignedToMe = maintenanceRepository.findByAssignedSupervisorId(supervisorId);
-            List<MaintenanceRequest> inMyDivision = maintenanceRepository.findByDivisionId(user.getDivisionId());
+            List<MaintenanceRequest> inMyDivision = maintenanceRepository.findByDivisionId(normalizedDivisionId);
             
             // Combine and deduplicate
             Set<MaintenanceRequest> combined = new HashSet<>(assignedToMe);
