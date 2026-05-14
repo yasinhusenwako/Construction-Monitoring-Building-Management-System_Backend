@@ -32,9 +32,7 @@ public class ProjectRequestDTO {
     private String description;
     @NotNull
     private BigDecimal budget;
-    @NotNull
     private LocalDate startDate;
-    @NotNull
     private LocalDate endDate;
     @NotBlank
     private String classification;
