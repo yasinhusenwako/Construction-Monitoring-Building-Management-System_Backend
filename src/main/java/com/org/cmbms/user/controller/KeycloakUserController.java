@@ -87,15 +87,12 @@ public class KeycloakUserController {
             request.getFirstName(),
             request.getLastName(),
             request.getPassword(),
-            request.getRoles()
+            request.getRoles(),
+            request.getEnabled()
         );
 
-        // Update user attributes if provided
-        if (request.getPhone() != null || request.getDepartment() != null || 
-            request.getDivisionId() != null || request.getProfession() != null) {
-            updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
-                               request.getDivisionId(), request.getProfession());
-        }
+        updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
+                           request.getDivisionId(), request.getProfession());
 
         Map<String, String> response = new HashMap<>();
         response.put("id", userId);
@@ -123,6 +120,7 @@ public class KeycloakUserController {
 
         keycloakAdminService.updateUser(
             userId,
+            request.getUsername(),
             request.getEmail(),
             request.getFirstName(),
             request.getLastName(),
@@ -130,12 +128,8 @@ public class KeycloakUserController {
             request.getRoles()
         );
 
-        // Update user attributes if provided
-        if (request.getPhone() != null || request.getDepartment() != null || 
-            request.getDivisionId() != null || request.getProfession() != null) {
-            updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
-                               request.getDivisionId(), request.getProfession());
-        }
+        updateUserAttributes(userId, request.getPhone(), request.getDepartment(), 
+                           request.getDivisionId(), request.getProfession());
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "User updated successfully");
@@ -315,18 +309,10 @@ public class KeycloakUserController {
                 attributes = new HashMap<>();
             }
 
-            if (phone != null) {
-                attributes.put("phone", List.of(phone));
-            }
-            if (department != null) {
-                attributes.put("department", List.of(department));
-            }
-            if (divisionId != null) {
-                attributes.put("divisionId", List.of(divisionId));
-            }
-            if (profession != null) {
-                attributes.put("profession", List.of(profession));
-            }
+            putOrRemoveAttribute(attributes, "phone", phone);
+            putOrRemoveAttribute(attributes, "department", department);
+            putOrRemoveAttribute(attributes, "divisionId", divisionId);
+            putOrRemoveAttribute(attributes, "profession", profession);
 
             user.setAttributes(attributes);
             
@@ -338,5 +324,14 @@ public class KeycloakUserController {
             log.error("Failed to update user attributes", e);
             throw new ApiException("Failed to update user attributes: " + e.getMessage());
         }
+    }
+
+    private void putOrRemoveAttribute(Map<String, List<String>> attributes, String key, String value) {
+        if (value == null || value.isBlank()) {
+            attributes.remove(key);
+            return;
+        }
+
+        attributes.put(key, List.of(value.trim()));
     }
 }

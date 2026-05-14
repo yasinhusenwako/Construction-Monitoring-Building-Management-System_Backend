@@ -14,6 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 public class KeycloakUserUpdateRequest {
     
+    private String username;
+
     @Email(message = "Email must be valid")
     private String email;
     

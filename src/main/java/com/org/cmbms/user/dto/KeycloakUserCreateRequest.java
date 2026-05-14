@@ -32,6 +32,7 @@ public class KeycloakUserCreateRequest {
     private String password;
     
     private List<String> roles;
+    private Boolean enabled;
     
     // Additional fields
     private String phone;
