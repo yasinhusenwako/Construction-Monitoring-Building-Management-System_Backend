@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface MaintenanceRepository extends JpaRepository<MaintenanceRequest, Long>, JpaSpecificationExecutor<MaintenanceRequest> {
     List<MaintenanceRequest> findByDivisionId(String divisionId);
+    List<MaintenanceRequest> findByDivisionIdIn(List<String> divisionIds);
     List<MaintenanceRequest> findByAssignedSupervisorId(String supervisorId); // Changed to String
     List<MaintenanceRequest> findByAssignedProfessionalId(String professionalId); // Changed to String
     List<MaintenanceRequest> findByCreatedBy(String createdBy); // Changed to String

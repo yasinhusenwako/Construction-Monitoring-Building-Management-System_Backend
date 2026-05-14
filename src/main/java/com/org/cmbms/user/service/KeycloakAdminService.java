@@ -59,7 +59,7 @@ public class KeycloakAdminService {
      * Create a new user in Keycloak
      */
     public String createUser(String username, String email, String firstName, String lastName, 
-                            String password, List<String> roles) {
+                            String password, List<String> roles, Boolean enabled) {
         try {
             RealmResource realmResource = keycloakAdminClient.realm(realm);
             UsersResource usersResource = realmResource.users();
@@ -76,7 +76,7 @@ public class KeycloakAdminService {
             user.setEmail(email);
             user.setFirstName(firstName);
             user.setLastName(lastName);
-            user.setEnabled(true);
+            user.setEnabled(enabled == null || enabled);
             user.setEmailVerified(true);
 
             // Create user
@@ -114,7 +114,7 @@ public class KeycloakAdminService {
     /**
      * Update an existing user in Keycloak
      */
-    public void updateUser(String userId, String email, String firstName, String lastName, 
+    public void updateUser(String userId, String username, String email, String firstName, String lastName, 
                           Boolean enabled, List<String> roles) {
         try {
             RealmResource realmResource = keycloakAdminClient.realm(realm);
@@ -122,6 +122,7 @@ public class KeycloakAdminService {
             UserRepresentation user = userResource.toRepresentation();
 
             // Update user fields
+            if (username != null && !username.isBlank()) user.setUsername(username.trim());
             if (email != null) user.setEmail(email);
             if (firstName != null) user.setFirstName(firstName);
             if (lastName != null) user.setLastName(lastName);

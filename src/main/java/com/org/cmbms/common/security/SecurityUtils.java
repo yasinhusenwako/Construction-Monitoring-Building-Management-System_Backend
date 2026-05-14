@@ -85,6 +85,12 @@ public final class SecurityUtils {
                 if (attributesObj instanceof java.util.Map) {
                     java.util.Map<String, Object> attributes = (java.util.Map<String, Object>) attributesObj;
                     Object divIdObj = attributes.get("divisionId");
+                    if (divIdObj == null) {
+                        divIdObj = attributes.get("division_id");
+                    }
+                    if (divIdObj == null) {
+                        divIdObj = attributes.get("divisionid");
+                    }
                     if (divIdObj != null) {
                         if (divIdObj instanceof java.util.List) {
                             java.util.List<?> divIdList = (java.util.List<?>) divIdObj;
@@ -111,6 +117,12 @@ public final class SecurityUtils {
                     
                     if (keycloakUser != null && keycloakUser.getAttributes() != null) {
                         java.util.List<String> divisionIdList = keycloakUser.getAttributes().get("divisionId");
+                        if (divisionIdList == null || divisionIdList.isEmpty()) {
+                            divisionIdList = keycloakUser.getAttributes().get("division_id");
+                        }
+                        if (divisionIdList == null || divisionIdList.isEmpty()) {
+                            divisionIdList = keycloakUser.getAttributes().get("divisionid");
+                        }
                         if (divisionIdList != null && !divisionIdList.isEmpty()) {
                             divisionId = divisionIdList.get(0);
                             System.out.println("✅ Fetched divisionId from Keycloak: " + divisionId);

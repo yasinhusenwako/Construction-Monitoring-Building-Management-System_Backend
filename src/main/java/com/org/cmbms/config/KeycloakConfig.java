@@ -1,7 +1,6 @@
 package com.org.cmbms.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.keycloak.adapters.springboot.KeycloakSpringBootConfigResolver;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,11 +23,6 @@ public class KeycloakConfig {
     @Value("${keycloak.admin.client-secret}")
     private String clientSecret;
 
-    @Bean
-    public KeycloakSpringBootConfigResolver keycloakConfigResolver() {
-        return new KeycloakSpringBootConfigResolver();
-    }
-
     @Value("${keycloak.admin.username:admin}")
     private String username;
 
@@ -39,21 +33,20 @@ public class KeycloakConfig {
     public Keycloak keycloakAdminClient() {
         log.info("Initializing Keycloak Admin Client");
         log.info("Server URL: {}", serverUrl);
-        log.info("Realm: {}", realm);
-        log.info("Client ID: {}", clientId);
-        log.info("Using service account authentication");
-        
+        log.info("Admin Username: {}", username);
+        log.info("Using master realm admin credentials");
+
         try {
-            // Use service account (client credentials) instead of username/password
-            // This is more reliable and secure
+            // Use master realm admin credentials (password grant) for full admin access
             Keycloak keycloak = KeycloakBuilder.builder()
                     .serverUrl(serverUrl)
-                    .realm(realm)
-                    .clientId(clientId)
-                    .clientSecret(clientSecret)
-                    .grantType("client_credentials")
+                    .realm("master")
+                    .clientId("admin-cli")
+                    .username(username)
+                    .password(password)
+                    .grantType("password")
                     .build();
-            
+
             log.info("Keycloak Admin Client initialized successfully");
             return keycloak;
         } catch (Exception e) {
