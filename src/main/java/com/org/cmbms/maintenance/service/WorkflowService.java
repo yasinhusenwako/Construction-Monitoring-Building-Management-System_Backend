@@ -167,20 +167,25 @@ public class WorkflowService {
         // We store it directly without validation since Keycloak users aren't in the database
         String professionalId = String.valueOf(request.getAssignedProfessionalId());
         
-        maintenance.setAssignedProfessionalId(professionalId);
+        // Add to the list of assigned professionals (supports multiple)
+        maintenance.addAssignedProfessional(professionalId);
+        
         Long supervisorNumericId = supervisor.getNumericId() != null ? supervisor.getNumericId() : 0L;
         transition(maintenance, Status.ASSIGNED_TO_PROFESSIONALS, supervisorNumericId);
 
         WorkOrder workOrder = workOrderRepository.findByMaintenanceRequestId(maintenance.getId()).orElse(new WorkOrder());
         workOrder.setMaintenanceRequestId(maintenance.getId());
-        workOrder.setAssignedProfessionalId(professionalId);
+        // Store all assigned professionals in work order
+        workOrder.setAssignedProfessionalId(maintenance.getAssignedProfessionalIds());
         workOrder.setInstructions(request.getInstructions());
         workOrder.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
         workOrderRepository.save(workOrder);
 
-        // Notify the professional about the assignment
-        requestLifecycleService.notifyUser(professionalId, "New Maintenance Assignment", 
-            "Maintenance " + maintenance.getMaintenanceId() + " has been assigned to you by supervisor");
+        // Notify ALL assigned professionals about the assignment
+        for (String profId : maintenance.getAssignedProfessionalIdsList()) {
+            requestLifecycleService.notifyUser(profId, "New Maintenance Assignment", 
+                "Maintenance " + maintenance.getMaintenanceId() + " has been assigned to you by supervisor");
+        }
         
         return maintenanceRepository.save(maintenance);
     }
@@ -190,20 +195,8 @@ public class WorkflowService {
         ensureRole(professional, Role.PROFESSIONAL);
         MaintenanceRequest maintenance = getMaintenance(id);
         
-        // Check if professional is assigned to this task
-        // For database users: compare numeric ID
-        // For Keycloak users: compare email
-        boolean isAssigned = false;
-        if (maintenance.getAssignedProfessionalId() != null) {
-            Long professionalNumericId = professional.getNumericId();
-            if (professionalNumericId != null) {
-                // Database user - compare numeric ID
-                isAssigned = maintenance.getAssignedProfessionalId().equals(String.valueOf(professionalNumericId));
-            } else {
-                // Keycloak user - compare email
-                isAssigned = maintenance.getAssignedProfessionalId().equals(professional.getEmail());
-            }
-        }
+        // Check if professional is assigned to this task (supports multiple professionals)
+        boolean isAssigned = maintenance.isAssignedToProfessional(professional.getId());
         
         if (!isAssigned) {
             throw new ApiException("professional sees only assigned tasks");
@@ -220,7 +213,7 @@ public class WorkflowService {
         if (request.getStatus() == Status.IN_PROGRESS && maintenance.getAssignedSupervisorId() != null) {
             requestLifecycleService.notifyUser(maintenance.getAssignedSupervisorId(), 
                 "Maintenance work started", 
-                "Maintenance " + maintenance.getMaintenanceId() + " work has started");
+                "Maintenance " + maintenance.getMaintenanceId() + " work has started by " + professional.getName());
         }
         
         return maintenanceRepository.save(maintenance);
@@ -318,14 +311,12 @@ public class WorkflowService {
         
         System.out.println("=== UPDATE TASK COST ===");
         System.out.println("Maintenance ID: " + id);
-        System.out.println("Assigned Professional ID (DB): " + maintenance.getAssignedProfessionalId());
+        System.out.println("Assigned Professionals: " + maintenance.getAssignedProfessionalIdsList());
         System.out.println("Current User ID: " + user.getId());
         System.out.println("Current User Email: " + user.getEmail());
         
-        // Verify the professional is assigned to this task
-        // Compare using user ID (email for Keycloak users, numeric string for legacy users)
-        String userId = user.getId();
-        if (maintenance.getAssignedProfessionalId() == null || userId == null || !maintenance.getAssignedProfessionalId().equals(userId)) {
+        // Verify the professional is assigned to this task (supports multiple professionals)
+        if (!maintenance.isAssignedToProfessional(user.getId())) {
             throw new ApiException("You are not assigned to this task");
         }
         

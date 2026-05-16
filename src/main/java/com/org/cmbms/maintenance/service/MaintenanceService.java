@@ -102,22 +102,26 @@ public class MaintenanceService {
                                            String maintenanceId,
                                            String divisionId,
                                            String createdBy) { // Changed to String
-        // Professionals only see their assigned requests
+        // Professionals only see their assigned requests (supports multiple professionals)
         if (user.getRole() == Role.PROFESSIONAL) {
-            // Use email as ID for Keycloak users
             String professionalId = user.getId();
             System.out.println("=== PROFESSIONAL FETCHING MAINTENANCE ===");
             System.out.println("Professional ID: " + professionalId);
             System.out.println("Professional Email: " + user.getEmail());
             System.out.println("Professional Role: " + user.getRole());
             
-            List<MaintenanceRequest> requests = maintenanceRepository.findByAssignedProfessionalId(professionalId);
-            System.out.println("Found " + requests.size() + " maintenance requests assigned to professional");
-            for (MaintenanceRequest m : requests) {
-                System.out.println("  - Maintenance: " + m.getMaintenanceId() + ", Assigned to: " + m.getAssignedProfessionalId());
+            // Find all maintenance where this professional is in the assigned list
+            List<MaintenanceRequest> allRequests = maintenanceRepository.findAll();
+            List<MaintenanceRequest> assignedRequests = allRequests.stream()
+                .filter(m -> m.isAssignedToProfessional(professionalId))
+                .collect(java.util.stream.Collectors.toList());
+            
+            System.out.println("Found " + assignedRequests.size() + " maintenance requests assigned to professional");
+            for (MaintenanceRequest m : assignedRequests) {
+                System.out.println("  - Maintenance: " + m.getMaintenanceId() + ", Assigned to: " + m.getAssignedProfessionalIdsList());
             }
             
-            return requests;
+            return assignedRequests;
         }
         
         // Supervisors need a division
@@ -191,6 +195,7 @@ public class MaintenanceService {
         System.out.println("Maintenance Business ID: " + maintenance.getMaintenanceId());
         System.out.println("Professional ID: " + professionalId);
         System.out.println("Current Status: " + maintenance.getStatus());
+        System.out.println("Currently Assigned: " + maintenance.getAssignedProfessionalIdsList());
 
         // For maintenance, admin can directly assign professional from Submitted or Under Review
         Status current = maintenance.getStatus();
@@ -202,11 +207,12 @@ public class MaintenanceService {
             throw new ApiException("Maintenance must be under review before assigning a professional");
         }
         
-        maintenance.setAssignedProfessionalId(professionalId);
+        // Add to the list of assigned professionals (supports multiple)
+        maintenance.addAssignedProfessional(professionalId);
         maintenance.setStatus(Status.ASSIGNED_TO_PROFESSIONALS);
         
         System.out.println("New Status: " + maintenance.getStatus());
-        System.out.println("Assigned Professional ID: " + maintenance.getAssignedProfessionalId());
+        System.out.println("Assigned Professionals: " + maintenance.getAssignedProfessionalIdsList());
         System.out.println("Notification sent to professional");
         System.out.println("=== ASSIGNMENT COMPLETE ===");
         
