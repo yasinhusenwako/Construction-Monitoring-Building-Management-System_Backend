@@ -45,12 +45,19 @@ public class SecurityConfigKeycloak {
                     "/api/history/backfill-actors",
                     "/api/history/debug/**"
                 ).permitAll()
+                // Project assignment endpoints - require authentication only
+                .requestMatchers("/api/admin/projects/*/assign-professional", 
+                              "/api/admin/projects/*/assignments",
+                              "/api/admin/projects/*/reports",
+                              "/api/admin/projects/*/assignments/*")
+                .authenticated()
+                // Professional endpoints - require authentication only
+                .requestMatchers("/api/professional/projects/**")
+                .authenticated()
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Supervisor endpoints
                 .requestMatchers("/api/supervisor/**").hasAnyRole("SUPERVISOR", "ADMIN")
-                // Professional endpoints
-                .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
                 // Shared endpoints
                 .requestMatchers("/api/projects/**", "/api/bookings/**", "/api/maintenance/**")
                     .hasAnyRole("ADMIN", "USER", "SUPERVISOR", "PROFESSIONAL")

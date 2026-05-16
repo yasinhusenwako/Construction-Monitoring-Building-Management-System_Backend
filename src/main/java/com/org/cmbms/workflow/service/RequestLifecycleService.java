@@ -35,9 +35,9 @@ public class RequestLifecycleService {
 
     // Project/Booking workflow: admin can directly assign professional
     private static final Map<Status, EnumSet<Status>> PROJECT_BOOKING_TRANSITIONS = Map.of(
-            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW),
-            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS),
-            Status.ASSIGNED_TO_PROFESSIONALS, EnumSet.of(Status.IN_PROGRESS),
+            Status.SUBMITTED, EnumSet.of(Status.UNDER_REVIEW, Status.REJECTED),
+            Status.UNDER_REVIEW, EnumSet.of(Status.ASSIGNED_TO_PROFESSIONALS, Status.REJECTED),
+            Status.ASSIGNED_TO_PROFESSIONALS, EnumSet.of(Status.IN_PROGRESS, Status.COMPLETED),
             Status.IN_PROGRESS, EnumSet.of(Status.COMPLETED),
             Status.COMPLETED, EnumSet.of(Status.APPROVED, Status.REJECTED),
             Status.APPROVED, EnumSet.of(Status.CLOSED),

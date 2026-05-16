@@ -33,21 +33,45 @@ public class KeycloakConfig {
     public Keycloak keycloakAdminClient() {
         log.info("Initializing Keycloak Admin Client");
         log.info("Server URL: {}", serverUrl);
-        log.info("Admin Username: {}", username);
-        log.info("Using master realm admin credentials");
+        log.info("Realm: {}", realm);
+        log.info("Client ID: {}", clientId);
 
         try {
-            // Use master realm admin credentials (password grant) for full admin access
+            // Check if we have username/password (admin credentials)
+            if (username != null && !username.isEmpty() && 
+                password != null && !password.isEmpty() && 
+                !"admin".equals(username)) {
+                
+                log.info("Using admin username/password authentication");
+                Keycloak keycloak = KeycloakBuilder.builder()
+                        .serverUrl(serverUrl)
+                        .realm("master")
+                        .clientId("admin-cli")
+                        .username(username)
+                        .password(password)
+                        .grantType("password")
+                        .build();
+                
+                log.info("Keycloak Admin Client initialized with password grant");
+                return keycloak;
+            }
+            
+            // Otherwise use client credentials (service account)
+            if (clientSecret == null || clientSecret.isEmpty()) {
+                throw new IllegalStateException("Keycloak client secret is not configured. " +
+                    "Please set KEYCLOAK_ADMIN_CLIENT_SECRET or provide admin username/password.");
+            }
+            
+            log.info("Using client credentials (service account) authentication");
             Keycloak keycloak = KeycloakBuilder.builder()
                     .serverUrl(serverUrl)
-                    .realm("master")
-                    .clientId("admin-cli")
-                    .username(username)
-                    .password(password)
-                    .grantType("password")
+                    .realm(realm)
+                    .clientId(clientId)
+                    .clientSecret(clientSecret)
+                    .grantType("client_credentials")
                     .build();
 
-            log.info("Keycloak Admin Client initialized successfully");
+            log.info("Keycloak Admin Client initialized with client credentials");
             return keycloak;
         } catch (Exception e) {
             log.error("Failed to initialize Keycloak Admin Client", e);

@@ -6,9 +6,13 @@ com\org\cmbms\project\dto\BoqRequest.class
 com\org\cmbms\user\dto\KeycloakUserUpdateRequest$KeycloakUserUpdateRequestBuilder.class
 com\org\cmbms\user\model\User.class
 com\org\cmbms\config\CorsConfig.class
+com\org\cmbms\project\dto\SubmitProfessionalReportRequest.class
+com\org\cmbms\project\service\ProjectAssignmentService.class
 com\org\cmbms\reporting\controller\ReportController.class
 com\org\cmbms\user\dto\KeycloakUserCreateRequest$KeycloakUserCreateRequestBuilder.class
 com\org\cmbms\maintenance\model\StatusHistory.class
+com\org\cmbms\project\repository\ProjectAssignmentRepository.class
+com\org\cmbms\project\controller\AdminProjectAssignmentController.class
 com\org\cmbms\common\exception\ApiException.class
 com\org\cmbms\common\exception\GlobalExceptionHandler.class
 com\org\cmbms\project\service\ProjectService.class
@@ -27,10 +31,13 @@ com\org\cmbms\maintenance\model\WorkOrder.class
 com\org\cmbms\maintenance\service\MaintenanceService.class
 com\org\cmbms\common\exception\ResourceNotFoundException.class
 com\org\cmbms\common\enums\Status.class
+com\org\cmbms\project\model\ProjectAssignment.class
 com\org\cmbms\user\dto\KeycloakUserCreateRequest.class
 com\org\cmbms\preventive\repository\PreventiveScheduleRepository.class
 com\org\cmbms\CmbmsApplication.class
 com\org\cmbms\preventive\controller\PreventiveScheduleController.class
+com\org\cmbms\project\dto\ProfessionalReportDTO.class
+com\org\cmbms\project\controller\ProfessionalProjectController.class
 com\org\cmbms\maintenance\controller\MaintenanceController.class
 com\org\cmbms\notification\controller\NotificationController.class
 com\org\cmbms\space\controller\SpaceController.class
@@ -43,6 +50,7 @@ com\org\cmbms\maintenance\dto\AdminAssignRequest.class
 com\org\cmbms\auth\security\UserPrincipal.class
 com\org\cmbms\maintenance\repository\MaintenanceRepository.class
 com\org\cmbms\maintenance\model\MaintenanceRequest.class
+com\org\cmbms\project\dto\ProjectAssignmentDTO.class
 com\org\cmbms\file\repository\FileRecordRepository.class
 com\org\cmbms\user\controller\KeycloakUserController.class
 com\org\cmbms\common\enums\Role.class
@@ -63,7 +71,10 @@ com\org\cmbms\history\service\RequestHistoryService.class
 com\org\cmbms\user\dto\KeycloakUserDTO.class
 com\org\cmbms\maintenance\dto\ReviewRequest.class
 com\org\cmbms\maintenance\dto\AssignGenericRequest.class
+com\org\cmbms\project\model\ProfessionalReport.class
 com\org\cmbms\FlywayConfig.class
+com\org\cmbms\project\repository\ProfessionalReportRepository.class
+com\org\cmbms\notification\service\NotificationCleanupService.class
 com\org\cmbms\common\util\DivisionRules.class
 com\org\cmbms\workflow\service\RequestLifecycleService.class
 com\org\cmbms\config\SecurityUtilsConfig.class
@@ -89,3 +100,4 @@ com\org\cmbms\maintenance\dto\TaskStatusUpdateRequest.class
 com\org\cmbms\maintenance\controller\AdminController$1.class
 com\org\cmbms\preventive\dto\PreventiveScheduleRequest.class
 com\org\cmbms\maintenance\service\WorkflowService.class
+com\org\cmbms\project\dto\AssignProfessionalToProjectRequest.class

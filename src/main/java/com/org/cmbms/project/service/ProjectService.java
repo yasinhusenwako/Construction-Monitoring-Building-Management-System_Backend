@@ -37,6 +37,7 @@ import java.util.Set;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final com.org.cmbms.project.repository.ProjectAssignmentRepository projectAssignmentRepository;
     private final FileStorageService fileStorageService;
     private final RequestLifecycleService requestLifecycleService;
     private final UserRepository userRepository;
@@ -209,10 +210,24 @@ public class ProjectService {
             System.out.println("Professional Email: " + currentUser.getEmail());
             System.out.println("Professional Role: " + currentUser.getRole());
             
-            List<Project> projects = projectRepository.findByAssignedProfessionalId(professionalId);
+            // MULTI-PROFESSIONAL UPDATE: Fetch assignments instead of a single string
+            List<com.org.cmbms.project.model.ProjectAssignment> assignments = projectAssignmentRepository.findActiveAssignmentsByProfessionalId(professionalId);
+            List<Long> projectIds = assignments.stream().map(com.org.cmbms.project.model.ProjectAssignment::getProjectId).collect(java.util.stream.Collectors.toList());
+            
+            // Also include legacy single-assigned projects just in case
+            List<Project> legacyProjects = projectRepository.findByAssignedProfessionalId(professionalId);
+            for (Project p : legacyProjects) {
+                if (!projectIds.contains(p.getId())) {
+                    projectIds.add(p.getId());
+                }
+            }
+            
+            if (projectIds.isEmpty()) return new ArrayList<>();
+            
+            List<Project> projects = projectRepository.findAllById(projectIds);
             System.out.println("Found " + projects.size() + " projects assigned to professional");
             for (Project p : projects) {
-                System.out.println("  - Project: " + p.getProjectId() + ", Assigned to: " + p.getAssignedProfessionalId());
+                System.out.println("  - Project: " + p.getProjectId());
             }
             
             return projects;
@@ -259,7 +274,19 @@ public class ProjectService {
         if (currentUser.getRole() == Role.PROFESSIONAL) {
             // For professionals, only return projects assigned to them
             String professionalId = currentUser.getId();
-            return projectRepository.findByAssignedProfessionalId(professionalId);
+            List<com.org.cmbms.project.model.ProjectAssignment> assignments = projectAssignmentRepository.findActiveAssignmentsByProfessionalId(professionalId);
+            List<Long> projectIds = assignments.stream().map(com.org.cmbms.project.model.ProjectAssignment::getProjectId).collect(java.util.stream.Collectors.toList());
+            
+            // Add legacy single-assigned projects
+            List<Project> legacyProjects = projectRepository.findByAssignedProfessionalId(professionalId);
+            for (Project p : legacyProjects) {
+                if (!projectIds.contains(p.getId())) {
+                    projectIds.add(p.getId());
+                }
+            }
+            
+            if (projectIds.isEmpty()) return new ArrayList<>();
+            return projectRepository.findAllById(projectIds);
         }
         
         if (currentUser.getRole() == Role.SUPERVISOR) {
@@ -517,9 +544,9 @@ public class ProjectService {
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
         
         System.out.println("Found project: " + project.getProjectId());
-        System.out.println("Assigned professional: " + project.getAssignedProfessionalId());
         
-        if (!project.getAssignedProfessionalId().equals(professional.getId())) {
+        boolean isAssigned = projectAssignmentRepository.existsByProjectIdAndProfessionalId(project.getId(), professional.getId());
+        if (!isAssigned && (project.getAssignedProfessionalId() == null || !project.getAssignedProfessionalId().equals(professional.getId()))) {
             throw new ApiException("You are not assigned to this project");
         }
         
@@ -544,7 +571,9 @@ public class ProjectService {
             throw new ApiException("Access denied");
         }
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
-        if (!project.getAssignedProfessionalId().equals(professional.getId())) {
+        
+        boolean isAssigned = projectAssignmentRepository.existsByProjectIdAndProfessionalId(project.getId(), professional.getId());
+        if (!isAssigned && (project.getAssignedProfessionalId() == null || !project.getAssignedProfessionalId().equals(professional.getId()))) {
             throw new ApiException("You are not assigned to this project");
         }
         Status current = project.getStatus();

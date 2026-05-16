@@ -63,7 +63,7 @@ keycloak:
   auth-server-url: http://localhost:8090
   resource: buildms-backend
   credentials:
-    secret: ${KEYCLOAK_CLIENT_SECRET:}
+    secret: ${KEYCLOAK_CLIENT_SECRET:JdILvgrbcTDo4Jci7oumL0Us5Ys38R4O}
   use-resource-role-mappings: false
   bearer-only: true
   ssl-required: none
@@ -73,6 +73,6 @@ keycloak:
     server-url: http://localhost:8090
     realm: buildms
     client-id: buildms-backend
-    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:JdILvgrbcTDo4Jci7oumL0Us5Ys38R4O}
     username: ${KEYCLOAK_ADMIN_USERNAME:}
     password: ${KEYCLOAK_ADMIN_PASSWORD:}

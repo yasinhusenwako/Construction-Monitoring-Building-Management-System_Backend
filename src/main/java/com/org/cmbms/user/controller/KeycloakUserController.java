@@ -87,7 +87,8 @@ public class KeycloakUserController {
             request.getFirstName(),
             request.getLastName(),
             request.getPassword(),
-            request.getRoles()
+            request.getRoles(),
+            true // enabled by default
         );
 
         // Always update user attributes (even if empty, to ensure consistency)
@@ -120,6 +121,7 @@ public class KeycloakUserController {
 
         keycloakAdminService.updateUser(
             userId,
+            request.getEmail(), // username - using email as username
             request.getEmail(),
             request.getFirstName(),
             request.getLastName(),
