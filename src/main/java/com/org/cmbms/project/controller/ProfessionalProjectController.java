@@ -96,4 +96,14 @@ public class ProfessionalProjectController {
         projectAssignmentService.completeAssignment(assignmentId, professional.getId());
         return ResponseEntity.ok().build();
     }
+    /**
+     * Mark an assignment as started
+     * PATCH /api/professional/projects/assignments/{assignmentId}/start
+     */
+    @PatchMapping("/assignments/{assignmentId}/start")
+    public ResponseEntity<Void> startAssignment(@PathVariable Long assignmentId) {
+        UserPrincipal professional = SecurityUtils.getCurrentUser();
+        projectAssignmentService.startAssignment(assignmentId, professional.getId());
+        return ResponseEntity.ok().build();
+    }
 }

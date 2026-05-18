@@ -162,4 +162,32 @@ public class AdminProjectAssignmentController {
         projectAssignmentService.requestClarification(assignmentId);
         return ResponseEntity.ok(Map.of("message", "Clarification requested"));
     }
+
+    /**
+     * Mark an assignment as approved
+     * PATCH /api/admin/projects/assignments/{assignmentId}/approve
+     */
+    @PatchMapping("/assignments/{assignmentId}/approve")
+    public ResponseEntity<?> approveAssignment(@PathVariable Long assignmentId) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        if (user.getRole() != com.org.cmbms.common.enums.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        projectAssignmentService.approveAssignment(assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Assignment approved"));
+    }
+
+    /**
+     * Mark an assignment as rejected
+     * PATCH /api/admin/projects/assignments/{assignmentId}/reject
+     */
+    @PatchMapping("/assignments/{assignmentId}/reject")
+    public ResponseEntity<?> rejectAssignment(@PathVariable Long assignmentId) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        if (user.getRole() != com.org.cmbms.common.enums.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        projectAssignmentService.rejectAssignment(assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Assignment rejected"));
+    }
 }

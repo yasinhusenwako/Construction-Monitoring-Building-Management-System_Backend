@@ -275,6 +275,42 @@ public class ProjectAssignmentService {
      * Deactivate an assignment
      */
     /**
+     * Mark an assignment as started by the professional
+     */
+    @Transactional
+    public void startAssignment(Long assignmentId, String professionalId) {
+        ProjectAssignment assignment = projectAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        
+        // Normalize professional ID for comparison
+        String normalizedProfId = normalizeProfessionalId(professionalId);
+        if (!assignment.getProfessionalId().equals(normalizedProfId)) {
+            System.err.println("❌ Auth failed: Assignment Prof ID: " + assignment.getProfessionalId() + 
+                             ", User Prof ID: " + normalizedProfId);
+            throw new IllegalArgumentException("Professional is not authorized to start this assignment");
+        }
+        
+        assignment.setStatus("IN_PROGRESS");
+        projectAssignmentRepository.save(assignment);
+        System.out.println("✅ Assignment " + assignmentId + " marked as IN_PROGRESS by " + normalizedProfId);
+        
+        // Update Project status to IN_PROGRESS if it's currently ASSIGNED_TO_PROFESSIONALS
+        Long projectId = assignment.getProjectId();
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project != null && project.getStatus() == com.org.cmbms.common.enums.Status.ASSIGNED_TO_PROFESSIONALS) {
+            System.out.println("🚀 First professional started task. Transitioning project " + projectId + " to IN_PROGRESS.");
+            requestLifecycleService.transition(
+                com.org.cmbms.common.enums.RequestType.PROJECT, 
+                project.getId(), 
+                com.org.cmbms.common.enums.Status.IN_PROGRESS, 
+                0L // System/Auto trigger
+            );
+            project.setStatus(com.org.cmbms.common.enums.Status.IN_PROGRESS);
+            projectRepository.save(project);
+        }
+    }
+
+    /**
      * Mark an assignment as completed by the professional
      */
     @Transactional
@@ -293,38 +329,30 @@ public class ProjectAssignmentService {
         assignment.setStatus("COMPLETED");
         projectAssignmentRepository.save(assignment);
         System.out.println("✅ Assignment " + assignmentId + " marked as COMPLETED by " + normalizedProfId);
-        
-        // Check if all assignments for this project are completed
-        Long projectId = assignment.getProjectId();
-        List<ProjectAssignment> allAssignments = projectAssignmentRepository.findByProjectId(projectId);
-        
-        // A project is completed only if ALL its active (non-deactivated) assignments are COMPLETED
-        boolean allFinished = allAssignments.stream()
-                .filter(a -> !"INACTIVE".equals(a.getStatus()))
-                .allMatch(a -> "COMPLETED".equals(a.getStatus()));
-        
-        System.out.println("Checking project completion status for Project ID " + projectId + ": " + allFinished);
-        
-        if (allFinished && !allAssignments.isEmpty()) {
-            Project project = projectRepository.findById(projectId).orElseThrow();
-            // Only transition if not already completed
-            if (project.getStatus() != com.org.cmbms.common.enums.Status.COMPLETED) {
-                // Transition the project status
-                System.out.println("🚀 All professional tasks finished. Transitioning project " + projectId + " to COMPLETED.");
-                
-                // Assuming admin or system context for the transition creator ID if needed, 
-                // but using professionalId for now as the trigger
-                requestLifecycleService.transition(
-                    com.org.cmbms.common.enums.RequestType.PROJECT, 
-                    project.getId(), 
-                    com.org.cmbms.common.enums.Status.COMPLETED, 
-                    0L // System/Auto trigger
-                );
-                
-                project.setStatus(com.org.cmbms.common.enums.Status.COMPLETED);
-                projectRepository.save(project);
-            }
-        }
+    }
+
+    /**
+     * Mark an assignment as approved by the admin
+     */
+    @Transactional
+    public void approveAssignment(Long assignmentId) {
+        ProjectAssignment assignment = projectAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        assignment.setStatus("APPROVED");
+        projectAssignmentRepository.save(assignment);
+        System.out.println("✅ Assignment " + assignmentId + " marked as APPROVED");
+    }
+
+    /**
+     * Mark an assignment as rejected by the admin
+     */
+    @Transactional
+    public void rejectAssignment(Long assignmentId) {
+        ProjectAssignment assignment = projectAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        assignment.setStatus("REJECTED");
+        projectAssignmentRepository.save(assignment);
+        System.out.println("✅ Assignment " + assignmentId + " marked as REJECTED");
     }
 
     @Transactional

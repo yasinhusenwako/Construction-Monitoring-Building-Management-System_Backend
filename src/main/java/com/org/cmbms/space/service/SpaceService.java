@@ -1,4 +1,3 @@
-
 package com.org.cmbms.space.service;
 
 import com.org.cmbms.auth.security.UserPrincipal;
@@ -10,6 +9,7 @@ import com.org.cmbms.common.util.DivisionRules;
 import com.org.cmbms.space.dto.BookingRequestDTO;
 import com.org.cmbms.space.model.Booking;
 import com.org.cmbms.space.repository.SpaceRepository;
+import com.org.cmbms.space.repository.BookingAssignmentRepository;
 import com.org.cmbms.user.model.User;
 import com.org.cmbms.user.repository.UserRepository;
 import com.org.cmbms.workflow.service.RequestLifecycleService;
@@ -25,11 +25,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SpaceService {
 
     private final SpaceRepository spaceRepository;
+    private final BookingAssignmentRepository bookingAssignmentRepository;
     private final RequestLifecycleService requestLifecycleService;
     private final UserRepository userRepository;
 
@@ -177,7 +179,10 @@ public class SpaceService {
             List<Predicate> predicates = new ArrayList<>();
             
             if (currentUser.getRole() == Role.PROFESSIONAL) {
-                // For professionals, return bookings assigned to them OR requested by them
+                // For professionals, return bookings:
+                // 1. Assigned to them via old single-professional system (assignedProfessionalId)
+                // 2. Requested by them
+                // 3. Assigned to them via new multi-professional system (checked separately below)
                 Predicate isAssigned = cb.equal(root.get("assignedProfessionalId"), currentUser.getId());
                 Predicate isRequester = cb.equal(root.get("requester"), currentUser.getId());
                 predicates.add(cb.or(isAssigned, isRequester));
@@ -220,7 +225,50 @@ public class SpaceService {
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        return spaceRepository.findAll(spec);
+        
+        List<Booking> results = spaceRepository.findAll(spec);
+        
+        // For professionals, also add bookings from multi-professional system
+        if (currentUser.getRole() == Role.PROFESSIONAL) {
+            System.out.println("=== PROFESSIONAL FETCHING BOOKINGS ===");
+            System.out.println("Professional ID: " + currentUser.getId());
+            System.out.println("Bookings from old system: " + results.size());
+            
+            // Get all multi-professional booking assignments for this professional
+            List<com.org.cmbms.space.model.BookingAssignment> assignments = 
+                bookingAssignmentRepository.findByProfessionalId(currentUser.getId());
+            
+            System.out.println("Multi-professional assignments found: " + assignments.size());
+            
+            // Get the booking IDs from assignments
+            Set<Long> multiProfBookingIds = assignments.stream()
+                .filter(a -> !"INACTIVE".equals(a.getStatus()))
+                .map(com.org.cmbms.space.model.BookingAssignment::getBookingId)
+                .collect(Collectors.toSet());
+            
+            System.out.println("Active multi-professional booking IDs: " + multiProfBookingIds);
+            
+            // Fetch bookings by these IDs and add to results (avoiding duplicates)
+            if (!multiProfBookingIds.isEmpty()) {
+                List<Booking> multiProfBookings = spaceRepository.findAllById(multiProfBookingIds);
+                System.out.println("Multi-professional bookings fetched: " + multiProfBookings.size());
+                
+                Set<Long> existingIds = results.stream()
+                    .map(Booking::getId)
+                    .collect(Collectors.toSet());
+                
+                for (Booking booking : multiProfBookings) {
+                    if (!existingIds.contains(booking.getId())) {
+                        results.add(booking);
+                        System.out.println("Added multi-professional booking: " + booking.getId());
+                    }
+                }
+            }
+            
+            System.out.println("Total bookings after multi-professional merge: " + results.size());
+        }
+        
+        return results;
     }
 
     public Booking supervisorReview(Long id, UserPrincipal supervisor) {
@@ -410,7 +458,36 @@ public class SpaceService {
             throw new ApiException("Access denied");
         }
         Booking booking = spaceRepository.findById(id).orElseThrow(() -> new ApiException("Booking not found"));
-        if (!booking.getAssignedProfessionalId().equals(professional.getId())) {
+        
+        System.out.println("=== PROFESSIONAL UPDATE STATUS ===");
+        System.out.println("Professional ID: " + professional.getId());
+        System.out.println("Booking ID: " + booking.getId());
+        System.out.println("Booking assignedProfessionalId: " + booking.getAssignedProfessionalId());
+        
+        // Check if professional is assigned via old system OR new multi-professional system
+        boolean isAssignedViaOldSystem = booking.getAssignedProfessionalId() != null && 
+                                        booking.getAssignedProfessionalId().equals(professional.getId());
+        
+        System.out.println("Is assigned via old system: " + isAssignedViaOldSystem);
+        
+        boolean isAssignedViaMultiProfessional = false;
+        if (!isAssignedViaOldSystem) {
+            try {
+                // Check multi-professional assignments
+                var assignment = bookingAssignmentRepository.findByBookingIdAndProfessionalId(booking.getId(), professional.getId());
+                isAssignedViaMultiProfessional = assignment.isPresent() && !"INACTIVE".equals(assignment.get().getStatus());
+                System.out.println("Is assigned via multi-professional: " + isAssignedViaMultiProfessional);
+                if (assignment.isPresent()) {
+                    System.out.println("Assignment status: " + assignment.get().getStatus());
+                }
+            } catch (Exception e) {
+                System.err.println("Error checking multi-professional assignments: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        if (!isAssignedViaOldSystem && !isAssignedViaMultiProfessional) {
+            System.err.println("Professional not assigned to this booking");
             throw new ApiException("You are not assigned to this booking");
         }
         
@@ -427,7 +504,6 @@ public class SpaceService {
         booking.setStatus(newStatus);
         
         // Notify admins and supervisor about status change
-        // Notify admins (both database and Keycloak) and supervisor about status change
         String notificationTitle = newStatus == Status.IN_PROGRESS ? "Booking work started" : "Booking completed";
         String notificationMessage = "Booking " + booking.getBookingId() + " is now " + newStatus.getValue();
         
@@ -466,5 +542,21 @@ public class SpaceService {
         spaceRepository.delete(booking);
         
         System.out.println("=== BOOKING DELETED ===");
+    }
+    
+    // ===== HELPER METHODS FOR BOOKING ASSIGNMENT SERVICE =====
+    
+    /**
+     * Get booking by ID (helper method for BookingAssignmentService)
+     */
+    public Booking getBookingById(Long bookingId) {
+        return spaceRepository.findById(bookingId).orElseThrow(() -> new ApiException("Booking not found with ID: " + bookingId));
+    }
+    
+    /**
+     * Update booking status (helper method for BookingAssignmentService)
+     */
+    public void updateBookingStatus(Booking booking) {
+        spaceRepository.save(booking);
     }
 }

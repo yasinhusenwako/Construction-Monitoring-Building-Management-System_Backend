@@ -187,26 +187,30 @@ public class WorkflowService {
 
     @Transactional
     public MaintenanceRequest updateTaskStatus(UserPrincipal professional, Long id, TaskStatusUpdateRequest request) {
-        ensureRole(professional, Role.PROFESSIONAL);
+        if (professional.getRole() != Role.PROFESSIONAL && professional.getRole() != Role.ADMIN) {
+            throw new ApiException("Access denied");
+        }
         MaintenanceRequest maintenance = getMaintenance(id);
         
-        // Check if professional is assigned to this task
+        // Check if professional is assigned to this task (skip for admins)
         // For database users: compare numeric ID
         // For Keycloak users: compare email
-        boolean isAssigned = false;
-        if (maintenance.getAssignedProfessionalId() != null) {
-            Long professionalNumericId = professional.getNumericId();
-            if (professionalNumericId != null) {
-                // Database user - compare numeric ID
-                isAssigned = maintenance.getAssignedProfessionalId().equals(String.valueOf(professionalNumericId));
-            } else {
-                // Keycloak user - compare email
-                isAssigned = maintenance.getAssignedProfessionalId().equals(professional.getEmail());
+        if (professional.getRole() == Role.PROFESSIONAL) {
+            boolean isAssigned = false;
+            if (maintenance.getAssignedProfessionalId() != null) {
+                Long professionalNumericId = professional.getNumericId();
+                if (professionalNumericId != null) {
+                    // Database user - compare numeric ID
+                    isAssigned = maintenance.getAssignedProfessionalId().equals(String.valueOf(professionalNumericId));
+                } else {
+                    // Keycloak user - compare email
+                    isAssigned = maintenance.getAssignedProfessionalId().equals(professional.getEmail());
+                }
             }
-        }
-        
-        if (!isAssigned) {
-            throw new ApiException("professional sees only assigned tasks");
+            
+            if (!isAssigned) {
+                throw new ApiException("professional sees only assigned tasks");
+            }
         }
         
         if (request.getStatus() != Status.IN_PROGRESS && request.getStatus() != Status.COMPLETED) {

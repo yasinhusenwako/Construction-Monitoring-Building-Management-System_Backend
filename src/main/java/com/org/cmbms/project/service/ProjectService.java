@@ -567,14 +567,17 @@ public class ProjectService {
     }
     @Transactional
     public Project professionalUpdateStatus(Long id, String statusStr, UserPrincipal professional) {
-        if (professional.getRole() != Role.PROFESSIONAL) {
+        if (professional.getRole() != Role.PROFESSIONAL && professional.getRole() != Role.ADMIN) {
             throw new ApiException("Access denied");
         }
         Project project = projectRepository.findById(id).orElseThrow(() -> new ApiException("Project not found"));
         
-        boolean isAssigned = projectAssignmentRepository.existsByProjectIdAndProfessionalId(project.getId(), professional.getId());
-        if (!isAssigned && (project.getAssignedProfessionalId() == null || !project.getAssignedProfessionalId().equals(professional.getId()))) {
-            throw new ApiException("You are not assigned to this project");
+        // Allow admins to skip the assignment check; professionals must be assigned
+        if (professional.getRole() == Role.PROFESSIONAL) {
+            boolean isAssigned = projectAssignmentRepository.existsByProjectIdAndProfessionalId(project.getId(), professional.getId());
+            if (!isAssigned && (project.getAssignedProfessionalId() == null || !project.getAssignedProfessionalId().equals(professional.getId()))) {
+                throw new ApiException("You are not assigned to this project");
+            }
         }
         Status current = project.getStatus();
         Status newStatus;
