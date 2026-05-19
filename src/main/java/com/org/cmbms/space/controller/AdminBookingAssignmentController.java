@@ -160,4 +160,46 @@ public class AdminBookingAssignmentController {
         bookingAssignmentService.markAssignmentReportsAsRead(assignmentId);
         return ResponseEntity.ok(Map.of("message", "Reports marked as read"));
     }
+
+    /**
+     * Request clarification on a booking assignment
+     * PATCH /api/admin/bookings/assignments/{assignmentId}/clarify
+     */
+    @PatchMapping("/assignments/{assignmentId}/clarify")
+    public ResponseEntity<?> requestClarification(@PathVariable Long assignmentId) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        if (user.getRole() != com.org.cmbms.common.enums.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        bookingAssignmentService.requestClarification(assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Clarification requested"));
+    }
+
+    /**
+     * Approve a booking assignment
+     * PATCH /api/admin/bookings/assignments/{assignmentId}/approve
+     */
+    @PatchMapping("/assignments/{assignmentId}/approve")
+    public ResponseEntity<?> approveAssignment(@PathVariable Long assignmentId) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        if (user.getRole() != com.org.cmbms.common.enums.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        bookingAssignmentService.approveAssignment(assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Assignment approved"));
+    }
+
+    /**
+     * Reject a booking assignment
+     * PATCH /api/admin/bookings/assignments/{assignmentId}/reject
+     */
+    @PatchMapping("/assignments/{assignmentId}/reject")
+    public ResponseEntity<?> rejectAssignment(@PathVariable Long assignmentId) {
+        UserPrincipal user = SecurityUtils.getCurrentUser();
+        if (user.getRole() != com.org.cmbms.common.enums.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        bookingAssignmentService.rejectAssignment(assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Assignment rejected"));
+    }
 }

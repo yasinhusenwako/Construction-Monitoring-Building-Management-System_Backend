@@ -332,6 +332,50 @@ public class BookingAssignmentService {
         reports.forEach(r -> r.setViewed(true));
         bookingReportRepository.saveAll(reports);
     }
+
+    /**
+     * Request clarification on a completed assignment (by admin)
+     */
+    @Transactional
+    public void requestClarification(Long assignmentId) {
+        BookingAssignment assignment = bookingAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        assignment.setStatus("NEEDS_CLARIFICATION");
+        bookingAssignmentRepository.save(assignment);
+        // Notify the professional
+        try {
+            requestLifecycleService.notifyUser(assignment.getProfessionalId(),
+                    "Clarification Requested",
+                    "The admin has requested clarification on your booking assignment. Please review and submit an updated report.");
+        } catch (Exception e) {
+            System.err.println("Failed to send clarification notification: " + e.getMessage());
+        }
+        System.out.println("✅ Booking Assignment " + assignmentId + " marked as NEEDS_CLARIFICATION");
+    }
+
+    /**
+     * Approve a completed assignment (by admin)
+     */
+    @Transactional
+    public void approveAssignment(Long assignmentId) {
+        BookingAssignment assignment = bookingAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        assignment.setStatus("APPROVED");
+        bookingAssignmentRepository.save(assignment);
+        System.out.println("✅ Booking Assignment " + assignmentId + " marked as APPROVED");
+    }
+
+    /**
+     * Reject a completed assignment (by admin)
+     */
+    @Transactional
+    public void rejectAssignment(Long assignmentId) {
+        BookingAssignment assignment = bookingAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + assignmentId));
+        assignment.setStatus("REJECTED");
+        bookingAssignmentRepository.save(assignment);
+        System.out.println("✅ Booking Assignment " + assignmentId + " marked as REJECTED");
+    }
     
     // ===== HELPER METHODS =====
     
